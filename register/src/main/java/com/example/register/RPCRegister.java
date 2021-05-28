@@ -22,6 +22,7 @@ public class RPCRegister {
             }
         }
 
+
     }
 
     public static Method reference(String value) {
