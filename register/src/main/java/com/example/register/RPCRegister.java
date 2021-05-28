@@ -21,6 +21,7 @@ public class RPCRegister {
                 map.put(value, m);
             }
         }
+
     }
 
     public static Method reference(String value) {
