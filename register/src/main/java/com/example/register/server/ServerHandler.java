@@ -5,11 +5,12 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 
-public class ServerHandler extends SimpleChannelInboundHandler {
+public class ServerHandler extends SimpleChannelInboundHandler<String> {
     private int lossConnectCount = 0;
     @Override
-    protected void channelRead0(ChannelHandlerContext channelHandlerContext, Object o) throws Exception {
-
+    protected void channelRead0(ChannelHandlerContext channelHandlerContext, String o) throws Exception {
+        System.out.println(o);
+        channelHandlerContext.writeAndFlush(o);
     }
 
     @Override

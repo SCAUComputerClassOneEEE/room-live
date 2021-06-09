@@ -8,6 +8,8 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 
 import java.util.concurrent.TimeUnit;
 
@@ -34,9 +36,11 @@ public class Server {
                                     .addLast(new ServerHandler());
                         }
                     });
-            ChannelFuture sync = serverBootstrap.bind(port).sync();
-
-
+            ChannelFuture sync = serverBootstrap
+                    .bind(port)
+                    .addListener(future -> System.out.println("Server start..."))
+                    .sync();
+            ChannelFuture sync1 = sync.channel().closeFuture().sync();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
