@@ -1,7 +1,7 @@
 package com.example.register.server;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -21,13 +21,14 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
      */
     @Override
     protected void channelRead0(ChannelHandlerContext cxt, FullHttpRequest request) throws Exception {
-        if (request.method().name().equals("GET")) {
+        if (request.method().name().equals("GET")) { // 主要的实现方法，长轮询
             getMethod(cxt, request);
         }
         switch (request.method().name()) {
-            case "PUT" :
-            case "DELETE" :
-            case  "POST" :
+            case "PUT" : putMethod(cxt, request); break;
+            case "DELETE" : deleteMethod(cxt, request); break;
+            case "POST" : postMethod(cxt, request); break;
+            default: response(cxt, "error http method!");
         }
     }
 
@@ -43,5 +44,28 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
         System.out.println("pull table");
         // appName do something...
+        System.out.println("c: " + clientVersion + "\n" + "a: " + appName);
+        response(cxt, "i know, and do it");
+    }
+
+    public void putMethod(ChannelHandlerContext cxt, FullHttpRequest request) {
+        ByteBuf content = request.content();
+
+    }
+
+    public void deleteMethod(ChannelHandlerContext cxt, FullHttpRequest request) {
+
+    }
+
+    public void postMethod(ChannelHandlerContext cxt, FullHttpRequest request) {
+
+    }
+
+    private void response(ChannelHandlerContext cxt, String c) {
+        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
+                HttpResponseStatus.OK,
+                Unpooled.copiedBuffer(c, CharsetUtil.UTF_8));
+
+        cxt.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
     }
 }
