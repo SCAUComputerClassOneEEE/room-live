@@ -8,7 +8,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * 表格存储
  */
 public class NodeTable {
+    /**
+     * 服务注册发现的核心表
+     */
     private static final ConcurrentHashMap<Identify, List<RemoteAddress>> map = new ConcurrentHashMap<>();
+    /**
+     * 我也不知道这玩意有没有用。。。
+     */
     private static volatile int initFlagInt = 1;
     private static final NodeTable table = new NodeTable();
 

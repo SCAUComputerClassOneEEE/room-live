@@ -7,6 +7,8 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
@@ -31,8 +33,9 @@ public class RegisterServer {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
                             socketChannel.pipeline()
-                                    .addLast(new IdleStateHandler(0,0,10, TimeUnit.SECONDS))
-                                    .addLast(new NettyServerHandler());
+                                    .addLast(new HttpServerCodec())
+                                    .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
+                                    .addLast(new HttpServerHandler());
                         }
                     });
             ChannelFuture channelFuture = bootstrap.bind(6668).sync();
@@ -44,37 +47,5 @@ public class RegisterServer {
             workGroup.shutdownGracefully();
         }
 
-    }
-
-    public static class NettyServerHandler extends ChannelInboundHandlerAdapter {
-        private int lossConnectCount = 0;
-
-        @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-            ByteBuf buf = (ByteBuf) msg;
-            System.out.println("客户端发送的数据是:" +buf.toString(CharsetUtil.UTF_8));
-
-        }
-
-        @Override
-        public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-
-        }
-
-        @Override
-        public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-            if (evt instanceof IdleStateEvent){
-                IdleStateEvent event = (IdleStateEvent)evt;
-                if (event.state()== IdleState.ALL_IDLE){
-                    lossConnectCount ++;
-                    if (lossConnectCount > 2){
-                        System.out.println("关闭这个不活跃通道！");
-                        ctx.channel().close();
-                    }
-                }
-            }else {
-                super.userEventTriggered(ctx,evt);
-            }
-        }
     }
 }
