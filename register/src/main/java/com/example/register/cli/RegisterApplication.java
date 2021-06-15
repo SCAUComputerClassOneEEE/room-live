@@ -1,4 +1,4 @@
-package com.example.register.cli.thread;
+package com.example.register.cli;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
