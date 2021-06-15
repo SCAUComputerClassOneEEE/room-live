@@ -6,7 +6,7 @@ package com.example.register.process;
  * 实现有两方面：client 和 server，他们有共同的行为：初始化，启动，关闭
  */
 public interface Application {
-    void init();
+    void init() throws Exception;
     void start();
     void stop();
 }

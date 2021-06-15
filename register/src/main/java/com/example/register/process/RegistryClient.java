@@ -16,7 +16,7 @@ public interface RegistryClient extends Application{
      *
      * 向 server 注册
      */
-    void export();
+    void register();
 
     /**
      *

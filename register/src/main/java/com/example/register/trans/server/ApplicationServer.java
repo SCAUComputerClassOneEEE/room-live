@@ -15,7 +15,7 @@ import io.netty.handler.codec.http.HttpServerCodec;
  * @author hiluyx
  * @since 2021/6/9 22:02
  **/
-public class ApplicationServerThread extends ApplicationThread<ServerBootstrap, ServerChannel> {
+public class ApplicationServer extends ApplicationThread<ServerBootstrap, ServerChannel> {
 
     private RegistryServer app;
 
@@ -52,10 +52,5 @@ public class ApplicationServerThread extends ApplicationThread<ServerBootstrap, 
             throw new Exception("server application thread init error.");
         }
         bootstrap = new ServerBootstrap();
-    }
-
-    @Override
-    public void run() {
-        start();
     }
 }

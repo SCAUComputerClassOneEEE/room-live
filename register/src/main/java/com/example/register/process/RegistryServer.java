@@ -8,7 +8,9 @@ public interface RegistryServer extends Application{
 
     /**
      *
-     * 数据推到 peer
+     * 同步数据，对自己的数据表更新，同时向 peers 推更新：
+     * - 如果是来自client的更新就发出对peers的同步；
+     * - 否则不再向远同步。
      */
     void replicate();
 

@@ -22,7 +22,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public void export() {
+    public void register() {
 
     }
 

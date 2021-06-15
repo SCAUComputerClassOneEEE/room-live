@@ -1,6 +1,9 @@
 package com.example.register.process;
 
 
+import com.example.register.trans.client.ApplicationClient;
+import com.example.register.trans.server.ApplicationServer;
+
 /**
  *
  * 单例
@@ -11,11 +14,28 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
 
     private static final NameCenterPeerProcess INSTANCE = new NameCenterPeerProcess();
 
+    /**
+     *
+     * 1 - inactive
+     * 2 - init ing
+     * 4 - start ing
+     * 8 - running
+     * 16- stopping
+     * 32- terminated
+     */
+    private static volatile short status = 1;
+
+    private final ApplicationClient client;
+    private final ApplicationServer server;
+
     // 基础通信：client 和 server
 
     // 注册表
 
-    private NameCenterPeerProcess() { }
+    private NameCenterPeerProcess() {
+        client = new ApplicationClient();
+        server = new ApplicationServer();
+    }
 
     public static NameCenterPeerProcess getInstance() {
         return INSTANCE;
@@ -35,8 +55,18 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
      * setup 4 准备对外服务
      */
     @Override
-    public void init() {
+    public void init() throws Exception {
         // only once
+        if (status == 1) {
+            synchronized (this) {
+                if (status == 1)
+                    status <<= 1;
+                else return;
+            }
+            client.init(this);
+            server.init(this);
+
+        }
     }
 
     /**
@@ -47,6 +77,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
     @Override
     public void start() {
         // only once
+
     }
 
     /**
@@ -64,7 +95,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
      * 该服务peer注册集群中到其他的peer中
      */
     @Override
-    public void export() {
+    public void register() {
 
     }
 
@@ -88,12 +119,6 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
 
     }
 
-    /**
-     *
-     * 同步数据，对自己的数据表更新，同时向peers更新
-     * 如果是client的更新就发出对peers的同步；
-     * 否则不在向远同步。
-     */
     @Override
     public void replicate() {
 

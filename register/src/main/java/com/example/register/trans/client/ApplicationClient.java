@@ -12,11 +12,11 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 
-public class ApplicationClientThread extends ApplicationThread<Bootstrap, Channel> {
+public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
 
     private RegistryClient app;
 
-    private void start() {
+    public void start() {
         EventLoopGroup loopGroup = new NioEventLoopGroup(1);
         Bootstrap bootstrap = new Bootstrap();
         try {
@@ -48,10 +48,5 @@ public class ApplicationClientThread extends ApplicationThread<Bootstrap, Channe
             throw new Exception("Client application thread init error.");
         }
         bootstrap = new Bootstrap();
-    }
-
-    @Override
-    public void run() {
-        start();
     }
 }
