@@ -1,32 +1,29 @@
-package com.example.register.server;
+package com.example.register.trans.server;
 
+import com.example.register.process.Application;
+import com.example.register.process.RegistryServer;
+import com.example.register.process.ServiceCenterPeerProcess;
+import com.example.register.trans.ApplicationThread;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.timeout.IdleState;
-import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.CharsetUtil;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author hiluyx
  * @since 2021/6/9 22:02
  **/
-public class RegisterServer {
-    public static void main(String[] args) {
-        EventLoopGroup boosGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workGroup = new NioEventLoopGroup();
-        ServerBootstrap bootstrap = new ServerBootstrap();
+public class ApplicationServerThread extends ApplicationThread<ServerBootstrap, ServerChannel> {
+
+    private RegistryServer app;
+
+    public void start() {
+        EventLoopGroup group = new NioEventLoopGroup(1);
         try{
-            bootstrap.group(boosGroup,workGroup)
+            bootstrap.group(group)
                     .channel(NioServerSocketChannel.class)
                     .option(ChannelOption.SO_BACKLOG,1024)
                     .childHandler(new ChannelInitializer<SocketChannel>() {
@@ -35,7 +32,7 @@ public class RegisterServer {
                             socketChannel.pipeline()
                                     .addLast(new HttpServerCodec())
                                     .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
-                                    .addLast(new HttpServerHandler());
+                                    .addLast(new HttpServerHandler(app));
                         }
                     });
             ChannelFuture channelFuture = bootstrap.bind(6668).sync();
@@ -43,9 +40,23 @@ public class RegisterServer {
         }catch (Exception e){
 
         }finally {
-            boosGroup.shutdownGracefully();
-            workGroup.shutdownGracefully();
+            group.shutdownGracefully();
         }
 
+    }
+
+    @Override
+    public void init(Application application) throws Exception {
+        if (application instanceof RegistryServer) {
+            app = (RegistryServer) application;
+        } else {
+            throw new Exception("server application thread init error.");
+        }
+        bootstrap = new ServerBootstrap();
+    }
+
+    @Override
+    public void run() {
+        start();
     }
 }
