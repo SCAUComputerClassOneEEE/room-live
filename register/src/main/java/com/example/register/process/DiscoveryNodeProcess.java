@@ -1,5 +1,10 @@
 package com.example.register.process;
 
+
+/**
+ *
+ * 开启一个线程，clientThread
+ */
 public class DiscoveryNodeProcess implements RegistryClient{
     @Override
     public void init() {
@@ -23,6 +28,11 @@ public class DiscoveryNodeProcess implements RegistryClient{
 
     @Override
     public void renew() {
+
+    }
+
+    @Override
+    public void discover() {
 
     }
 

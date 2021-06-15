@@ -6,8 +6,16 @@ package com.example.register.process;
  */
 public interface RegistryServer extends Application{
 
+    /**
+     *
+     * 数据推到 peer
+     */
     void replicate();
 
+    /**
+     *
+     * 从 peer 拉取全部数据
+     */
     void syncAll();
 
 }

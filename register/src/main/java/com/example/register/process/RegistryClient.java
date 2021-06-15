@@ -12,12 +12,34 @@ package com.example.register.process;
  */
 public interface RegistryClient extends Application{
 
+    /**
+     *
+     * 向 server 注册
+     */
     void export();
 
+    /**
+     *
+     * 向 server 续约
+     */
     void renew();
 
+    /**
+     *
+     * 向 server 拉取某个 provider
+     */
+    void discover();
+
+    /**
+     *
+     * 暂停服务
+     */
     void pause();
 
+    /**
+     *
+     * 下线，停止服务
+     */
     void offline();
 
 }

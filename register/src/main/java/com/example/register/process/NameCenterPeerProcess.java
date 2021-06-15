@@ -4,18 +4,20 @@ package com.example.register.process;
 /**
  *
  * 单例
+ *
+ * 开启两个线程，serverThread 和 clientThread
  */
-public class ServiceCenterPeerProcess implements RegistryServer, RegistryClient{
+public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
 
-    private static final ServiceCenterPeerProcess INSTANCE = new ServiceCenterPeerProcess();
+    private static final NameCenterPeerProcess INSTANCE = new NameCenterPeerProcess();
 
     // 基础通信：client 和 server
 
     // 注册表
 
-    private ServiceCenterPeerProcess() { }
+    private NameCenterPeerProcess() { }
 
-    public static ServiceCenterPeerProcess getInstance() {
+    public static NameCenterPeerProcess getInstance() {
         return INSTANCE;
     }
     /**
@@ -68,6 +70,11 @@ public class ServiceCenterPeerProcess implements RegistryServer, RegistryClient{
 
     @Override
     public void renew() {
+
+    }
+
+    @Override
+    public void discover() {
 
     }
 

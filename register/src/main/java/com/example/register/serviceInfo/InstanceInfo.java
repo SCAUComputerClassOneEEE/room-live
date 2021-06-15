@@ -1,4 +1,4 @@
-package com.example.register.service;
+package com.example.register.serviceInfo;
 
 import java.util.concurrent.atomic.AtomicLong;
 

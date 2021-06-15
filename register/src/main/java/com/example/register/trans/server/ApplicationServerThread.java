@@ -2,7 +2,6 @@ package com.example.register.trans.server;
 
 import com.example.register.process.Application;
 import com.example.register.process.RegistryServer;
-import com.example.register.process.ServiceCenterPeerProcess;
 import com.example.register.trans.ApplicationThread;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
