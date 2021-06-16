@@ -14,8 +14,17 @@ public class InstanceInfo {
     private ConcatAddress instAdr;
     private final AtomicLong version = new AtomicLong(0);
 
+    public InstanceInfo(String host, int port) {
+        instAdr = new ConcatAddress(host, port);
+    }
 
+    public String host() {
+        return instAdr.ip;
+    }
 
+    public int port() {
+        return instAdr.port;
+    }
 
     public ConcatAddress getInstAdr() {
         return instAdr;
@@ -32,6 +41,11 @@ public class InstanceInfo {
     public static class ConcatAddress {
         public String ip;
         public int port;
+
+        public ConcatAddress(String ip, int port) {
+            this.ip = ip;
+            this.port = port;
+        }
 
         public String getIp() {
             return ip;
