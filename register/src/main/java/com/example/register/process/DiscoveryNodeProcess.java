@@ -1,13 +1,15 @@
 package com.example.register.process;
 
 
+import com.example.register.serviceInfo.ServiceProvidersBootConfig;
+
 /**
  *
  * 开启一个线程，clientThread
  */
 public class DiscoveryNodeProcess implements RegistryClient{
     @Override
-    public void init() {
+    public void init(ServiceProvidersBootConfig config) {
 
     }
 

@@ -1,6 +1,8 @@
 package com.example.register.process;
 
 
+import com.example.register.serviceInfo.ServiceProvider;
+import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.server.ApplicationServer;
 
@@ -44,7 +46,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
      *
      *
      * 初始化，启动数据的远端同步
-     * setup 0 初始化 peers 列表
+     * setup 0 从参数 config 中初始化 peers 列表
      *      -
      * setup 1 对某一个 peer 发出全同步请求 syncAll()
      *      -
@@ -55,7 +57,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
      * setup 4 准备对外服务
      */
     @Override
-    public void init() throws Exception {
+    public void init(ServiceProvidersBootConfig config) throws Exception {
         // only once
         if (status == 1) {
             synchronized (this) {
@@ -127,5 +129,19 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
     @Override
     public void syncAll() {
 
+    }
+
+    /**
+     *
+     * 检测 provider 是否活跃
+     *
+     * 如果 provider 是自己，直接返回 true；
+     * 否则 GET http://provider::/status ，返回远端状态
+     * @param provider
+     * @return
+     */
+    @Override
+    public boolean isActive(ServiceProvider provider) {
+        return false;
     }
 }

@@ -1,6 +1,8 @@
 package com.example.register.serviceInfo;
 
 import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -13,11 +15,19 @@ import java.util.concurrent.ConcurrentSkipListSet;
  */
 public class ServiceApplicationsTable {
 
-    private ConcurrentHashMap<String, ConcurrentSkipListSet<ServiceProvider>> skipListMap = new ConcurrentHashMap<>();
-    private static final Comparator<ServiceProvider> comparator = (o1, o2) -> 0;
+    private static final String SERVER_PEER_NODE = "server-peer-node-service";
 
-    public ServiceApplicationsTable() {
+    private ConcurrentHashMap<String, ConcurrentHashMap<Long, ServiceProvider>> doubleMarkMap = new ConcurrentHashMap<>();
 
+    public ServiceApplicationsTable(ServiceProvidersBootConfig config, String selfAppName) {
+        ServiceProvider selfNode = config.getSelfNode();
+        ConcurrentHashMap<Long, ServiceProvider> selfServiceMap = new ConcurrentHashMap<>();
+        selfServiceMap.put(new Date().getTime(), selfNode);
+        doubleMarkMap.put(selfAppName, selfServiceMap);
+
+        ConcurrentHashMap<Long, ServiceProvider> appServiceMap = new ConcurrentHashMap<>();
+        config.getOthersPeerServerNodes().forEach((op)-> appServiceMap.put(new Date().getTime(), op));
+        doubleMarkMap.put(SERVER_PEER_NODE, appServiceMap);
     }
 
     public void remove(ServiceProvider.TypeServiceProvider type, String appName) {
@@ -25,16 +35,6 @@ public class ServiceApplicationsTable {
     }
 
     public void put(String appName, String host, int port, ServiceProvider.TypeServiceProvider type) {
-        ConcurrentSkipListSet<ServiceProvider> serviceProviders = skipListMap.get(appName);
-        if (serviceProviders == null) {
-            // init key
-            ServiceProvider serviceProvider = new ServiceProvider(host, port, type);
 
-            ConcurrentSkipListSet<ServiceProvider> objects = new ConcurrentSkipListSet<>(comparator);
-            objects.add(serviceProvider);
-            skipListMap.put(appName,objects);
-        } else {
-
-        }
     }
 }

@@ -1,5 +1,7 @@
 package com.example.register.process;
 
+import com.example.register.serviceInfo.ServiceProvider;
+
 /**
  *
  * 集群中的 server，继承 Application
@@ -19,5 +21,7 @@ public interface RegistryServer extends Application{
      * 从 peer 拉取全部数据
      */
     void syncAll();
+
+    boolean isActive(ServiceProvider provider);
 
 }
