@@ -20,7 +20,7 @@ public interface RegistryServer extends Application{
      *
      * 从 peer 拉取全部数据
      */
-    void syncAll();
+    boolean syncAll(ServiceProvider peerNode);
 
     boolean isActive(ServiceProvider provider);
 

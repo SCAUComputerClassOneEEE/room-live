@@ -9,4 +9,5 @@ public abstract class ApplicationThread<B extends AbstractBootstrap<B, C>, C ext
     protected AbstractBootstrap<B, C> bootstrap;
 
     public abstract void init(Application application) throws Exception;
+    public abstract void stopThread();
 }

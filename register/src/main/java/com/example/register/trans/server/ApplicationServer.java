@@ -18,31 +18,8 @@ import io.netty.handler.codec.http.HttpServerCodec;
 public class ApplicationServer extends ApplicationThread<ServerBootstrap, ServerChannel> {
 
     private RegistryServer app;
-
-    public void start() {
-        EventLoopGroup group = new NioEventLoopGroup(1);
-        try{
-            bootstrap.group(group)
-                    .channel(NioServerSocketChannel.class)
-                    .option(ChannelOption.SO_BACKLOG,1024)
-                    .childHandler(new ChannelInitializer<SocketChannel>() {
-                        @Override
-                        protected void initChannel(SocketChannel socketChannel) throws Exception {
-                            socketChannel.pipeline()
-                                    .addLast(new HttpServerCodec())
-                                    .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
-                                    .addLast(new HttpServerHandler(app));
-                        }
-                    });
-            ChannelFuture channelFuture = bootstrap.bind(6668).sync();
-            channelFuture.channel().closeFuture().sync();
-        }catch (Exception e){
-
-        }finally {
-            group.shutdownGracefully();
-        }
-
-    }
+    private final EventLoopGroup boosGroup = new NioEventLoopGroup(1);
+    private final EventLoopGroup workerGroup = new NioEventLoopGroup(1);
 
     @Override
     public void init(Application application) throws Exception {
@@ -52,5 +29,24 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
             throw new Exception("server application thread init error.");
         }
         bootstrap = new ServerBootstrap();
+
+        ((ServerBootstrap)bootstrap)
+                .group(boosGroup, workerGroup)
+                .channel(NioServerSocketChannel.class)
+                .option(ChannelOption.SO_BACKLOG,1024)
+                .childHandler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel socketChannel) throws Exception {
+                        socketChannel.pipeline()
+                                .addLast(new HttpServerCodec())
+                                .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
+                                .addLast(new HttpServerHandler(app));
+                    }
+                });
+    }
+
+    @Override
+    public void stopThread() {
+
     }
 }

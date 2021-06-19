@@ -2,43 +2,24 @@ package com.example.register.trans.client;
 
 import com.example.register.process.Application;
 import com.example.register.process.RegistryClient;
-import com.example.register.process.RegistryServer;
 import com.example.register.trans.ApplicationThread;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpServerCodec;
 
+/**
+ *
+ * queue for task
+ * 独立的任务 tasker 处理线程。
+ */
 public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
 
     private RegistryClient app;
-
-    public void start() {
-        EventLoopGroup loopGroup = new NioEventLoopGroup(1);
-        Bootstrap bootstrap = new Bootstrap();
-        try {
-            bootstrap.group(loopGroup)
-                    .channel(NioSocketChannel.class)
-                    .handler(new ChannelInitializer<SocketChannel>() {
-                        @Override
-                        protected void initChannel(SocketChannel socketChannel) throws Exception {
-                            socketChannel.pipeline().addLast(new HttpServerCodec())
-                                    .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
-                                    .addLast(new HttpClientHandler(app));
-                        }
-                    });
-            ChannelFuture future = bootstrap.connect("localhost",6668).sync();
-            future.channel().closeFuture().sync();
-        } catch (Exception e){
-
-        } finally {
-            loopGroup.shutdownGracefully();
-        }
-
-    }
+    private final EventLoopGroup clientNetWorkLoop = new NioEventLoopGroup();
 
     @Override
     public void init(Application application) throws Exception {
@@ -48,5 +29,23 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             throw new Exception("Client application thread init error.");
         }
         bootstrap = new Bootstrap();
+        final Bootstrap boots = (Bootstrap)bootstrap;
+        boots.group(clientNetWorkLoop)
+                .channel(NioSocketChannel.class)
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel socketChannel) throws Exception {
+                        socketChannel.pipeline()
+                                .addLast(new HttpClientCodec())
+                                .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
+                                .addLast(new HttpClientHandler(app));
+                    }
+                });
     }
+
+    @Override
+    public void stopThread() {
+
+    }
+
 }

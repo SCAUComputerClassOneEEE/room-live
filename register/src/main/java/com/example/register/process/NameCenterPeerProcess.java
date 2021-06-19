@@ -1,10 +1,16 @@
 package com.example.register.process;
 
 
+import com.example.register.serviceInfo.InstanceInfo;
+import com.example.register.serviceInfo.ServiceApplicationsTable;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.server.ApplicationServer;
+
+import javax.naming.directory.AttributeModificationException;
+import java.util.Date;
+import java.util.List;
 
 /**
  *
@@ -12,20 +18,15 @@ import com.example.register.trans.server.ApplicationServer;
  *
  * 开启两个线程，serverThread 和 clientThread
  */
-public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
+public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
 
     private static final NameCenterPeerProcess INSTANCE = new NameCenterPeerProcess();
+    private static final Long myself;
+    private static ServiceApplicationsTable table;
 
-    /**
-     *
-     * 1 - inactive
-     * 2 - init ing
-     * 4 - start ing
-     * 8 - running
-     * 16- stopping
-     * 32- terminated
-     */
-    private static volatile short status = 1;
+    static {
+        myself = new Date().getTime();
+    }
 
     private final ApplicationClient client;
     private final ApplicationServer server;
@@ -48,7 +49,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
      * 初始化，启动数据的远端同步
      * setup 0 从参数 config 中初始化 peers 列表
      *      -
-     * setup 1 对某一个 peer 发出全同步请求 syncAll()
+     * setup 1 对某一个 peer 发出全同步请求 syncAll() 阻塞
      *      -
      * setup 2 把自己的 InstanceInfo 同步发送出去 replicate()
      *      -
@@ -58,17 +59,17 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
      */
     @Override
     public void init(ServiceProvidersBootConfig config) throws Exception {
-        // only once
-        if (status == 1) {
-            synchronized (this) {
-                if (status == 1)
-                    status <<= 1;
-                else return;
-            }
-            client.init(this);
-            server.init(this);
-
+        // initialize the table with config and myself
+        table = new ServiceApplicationsTable(
+                config, myself, ServiceApplicationsTable.SERVER_PEER_NODE);
+        List<ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
+        for (ServiceProvider othersPeerServerNode : othersPeerServerNodes) {
+            if (syncAll(othersPeerServerNode)) break;
         }
+
+        // initialize the client and server's thread worker for working.
+        client.init(this);
+        server.init(this);
     }
 
     /**
@@ -127,8 +128,9 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
     }
 
     @Override
-    public void syncAll() {
-
+    public boolean syncAll(ServiceProvider peerNode) {
+        InstanceInfo info = peerNode.getInfo();
+        return true;
     }
 
     /**
@@ -143,5 +145,9 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient{
     @Override
     public boolean isActive(ServiceProvider provider) {
         return false;
+    }
+
+    private void lockForStatus() {
+
     }
 }

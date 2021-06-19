@@ -5,7 +5,7 @@ import java.util.List;
 public class ServiceProvidersBootConfig {
     // myself
     private ServiceProvider selfNode;
-    // others
+    // others server
     private List<ServiceProvider> othersPeerServerNodes;
 
     public ServiceProvider getSelfNode() {
