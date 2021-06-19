@@ -18,6 +18,12 @@ public class ServiceApplicationsTable {
 
     private static final ConcurrentHashMap<String, ConcurrentHashMap<Long, ServiceProvider>> doubleMarkMap = new ConcurrentHashMap<>();
 
+    public ServiceApplicationsTable(Long selfLong, String selfAppName, ServiceProvider selfNode) {
+        ConcurrentHashMap<Long, ServiceProvider> selfServiceMap = new ConcurrentHashMap<>();
+        selfServiceMap.put(selfLong, selfNode);
+        doubleMarkMap.put(selfAppName, selfServiceMap);
+    }
+
     public ServiceApplicationsTable(ServiceProvidersBootConfig config, /*初始化时候的服务列表*/
                                     Long selfLong, /*自己的long*/
                                     String selfAppName/*自己的appName*/) {

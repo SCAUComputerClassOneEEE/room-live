@@ -10,6 +10,7 @@ import com.example.register.trans.server.ApplicationServer;
 
 import javax.naming.directory.AttributeModificationException;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -60,13 +61,27 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
     @Override
     public void init(ServiceProvidersBootConfig config) throws Exception {
         // initialize the table with config and myself
-        table = new ServiceApplicationsTable(
-                config, myself, ServiceApplicationsTable.SERVER_PEER_NODE);
-        List<ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
-        for (ServiceProvider othersPeerServerNode : othersPeerServerNodes) {
-            if (syncAll(othersPeerServerNode)) break;
-        }
 
+        if (config.getServerClusterType().equals(ClusterType.SINGLE)) {
+            // othersPeerServerNodes == null
+            table = new ServiceApplicationsTable(
+                    myself, ServiceApplicationsTable.SERVER_PEER_NODE, config.getSelfNode());
+
+        } else {
+            table = new ServiceApplicationsTable(
+                config, myself, ServiceApplicationsTable.SERVER_PEER_NODE);
+            List<ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
+            for (ServiceProvider othersPeerServerNode : othersPeerServerNodes) {
+                if (syncAll(othersPeerServerNode)) break;
+            }
+            Iterator<ServiceProvider> servers = table.getServers();
+
+            while (servers.hasNext()) {
+                if (syncAll(servers.next())) break;
+                servers.remove();
+            }
+
+        }
         // initialize the client and server's thread worker for working.
         client.init(this);
         server.init(this);

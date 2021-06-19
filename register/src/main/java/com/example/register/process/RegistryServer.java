@@ -6,7 +6,11 @@ import com.example.register.serviceInfo.ServiceProvider;
  *
  * 集群中的 server，继承 Application
  */
-public interface RegistryServer extends Application{
+public interface RegistryServer extends Application {
+
+    enum ClusterType {
+        SINGLE, P2P
+    }
 
     /**
      *
