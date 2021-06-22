@@ -34,9 +34,11 @@ public class InstanceInfo {
         this.instAdr = instAdr;
     }
 
-    public AtomicLong getVersion() {
-        return version;
+    public long getVersion() {
+        return version.get();
     }
+
+    public long incrementVersion() { return version.incrementAndGet(); }
 
     public static class ConcatAddress {
         public String ip;

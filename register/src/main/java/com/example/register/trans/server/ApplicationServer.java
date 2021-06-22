@@ -21,6 +21,14 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
     private final EventLoopGroup boosGroup = new NioEventLoopGroup(1);
     private final EventLoopGroup workerGroup = new NioEventLoopGroup(1);
 
+    private static final Runnable runnable = () -> {
+
+    };
+
+    public ApplicationServer() {
+        super(runnable);
+    }
+
     @Override
     public void init(Application application) throws Exception {
         if (application instanceof RegistryServer) {

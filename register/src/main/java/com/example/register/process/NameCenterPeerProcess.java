@@ -29,16 +29,15 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
         myself = new Date().getTime();
     }
 
-    private final ApplicationClient client;
-    private final ApplicationServer server;
+    private ApplicationClient client;
+    private ApplicationServer server;
 
     // 基础通信：client 和 server
 
     // 注册表
 
     private NameCenterPeerProcess() {
-        client = new ApplicationClient();
-        server = new ApplicationServer();
+
     }
 
     public static NameCenterPeerProcess getInstance() {
@@ -82,6 +81,9 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
             }
 
         }
+
+        client = new ApplicationClient(config.getTaskQueueMaxSize());
+        server = new ApplicationServer();
         // initialize the client and server's thread worker for working.
         client.init(this);
         server.init(this);

@@ -6,6 +6,7 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
@@ -17,18 +18,23 @@ import java.nio.charset.StandardCharsets;
  * @author hiluyx
  * @since 2021/6/19 16:47
  **/
-public class HttpTaskExecutor implements TaskExecutor {
+public class HttpTaskCarrierExecutor implements Runnable {
     private Channel httpChannel; // how
     private InstanceInfo instanceInfo; // where
     private FullHttpRequest httpRequest; // for what
+    private ChannelFutureListener doneListener;
 
-    private HttpTaskExecutor() {}
+    private HttpTaskCarrierExecutor() {}
 
     public static class Builder {
+
+        // there are some read-only or write listener...
+
         private Bootstrap builderBootstrap;
         private InstanceInfo builderInfo;
         private FullHttpRequest builderRequest;
         private ByteBuf bodyBuf;
+        private ChannelFutureListener builderListener;
 
         public Builder builder() { return new Builder(); }
 
@@ -56,8 +62,13 @@ public class HttpTaskExecutor implements TaskExecutor {
             return this;
         }
 
-        public HttpTaskExecutor create() {
-            final HttpTaskExecutor target = new HttpTaskExecutor();
+        public Builder operatedCompletelyWith(ChannelFutureListener listener) {
+            builderListener = listener;
+            return this;
+        }
+
+        public HttpTaskCarrierExecutor create() {
+            final HttpTaskCarrierExecutor target = new HttpTaskCarrierExecutor();
 
             String ip = builderInfo.getInstAdr().getIp();
             int port = builderInfo.getInstAdr().getPort();
@@ -66,6 +77,7 @@ public class HttpTaskExecutor implements TaskExecutor {
             target.httpChannel = builderBootstrap.connect(ip, port).channel();
             target.instanceInfo = builderInfo;
             target.httpRequest = builderRequest;
+            target.doneListener = builderListener;
             return target;
         }
     }
@@ -76,9 +88,7 @@ public class HttpTaskExecutor implements TaskExecutor {
             if (httpChannel != null) {
                 final Channel channel = httpChannel;
                 try {
-                    channel.writeAndFlush(httpRequest).sync().addListener(future -> {
-                        // handler for http response
-                    });
+                    channel.writeAndFlush(httpRequest).sync().addListener(doneListener);
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
