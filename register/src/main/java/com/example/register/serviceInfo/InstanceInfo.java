@@ -1,5 +1,6 @@
 package com.example.register.serviceInfo;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -16,6 +17,19 @@ public class InstanceInfo {
 
     public InstanceInfo(String host, int port) {
         instAdr = new ConcatAddress(host, port);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        InstanceInfo that = (InstanceInfo) o;
+        return Objects.equals(instAdr, that.instAdr) && version.get() == that.version.get();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(instAdr, version.get());
     }
 
     public String host() {
@@ -63,6 +77,19 @@ public class InstanceInfo {
 
         public void setPort(int port) {
             this.port = port;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ConcatAddress that = (ConcatAddress) o;
+            return port == that.port && ip.equals(that.ip);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(ip, port);
         }
     }
 }

@@ -2,6 +2,7 @@ package com.example.register.serviceInfo;
 
 import com.example.register.process.RegistryServer;
 
+import java.util.Comparator;
 import java.util.List;
 
 public class ServiceProvidersBootConfig {
@@ -13,6 +14,10 @@ public class ServiceProvidersBootConfig {
     private RegistryServer.ClusterType serverClusterType;
 
     private int taskQueueMaxSize;
+    private int nextSize;
+    private int clientSubExecutors;
+
+    private Comparator<ServiceProvider> tableSetRankComparator;
 
     public int getTaskQueueMaxSize() {
         return taskQueueMaxSize;
@@ -30,6 +35,14 @@ public class ServiceProvidersBootConfig {
             othersPeerServerNodes = null;
     }
 
+    public Comparator<ServiceProvider> getTableSetRankComparator() {
+        return tableSetRankComparator;
+    }
+
+    public void setTableSetRankComparator(Comparator<ServiceProvider> tableSetRankComparator) {
+        this.tableSetRankComparator = tableSetRankComparator;
+    }
+
     public ServiceProvider getSelfNode() {
         return selfNode;
     }
@@ -45,5 +58,21 @@ public class ServiceProvidersBootConfig {
     public void setOthersPeerServerNodes(List<ServiceProvider> othersPeerServerNodes) {
         serverClusterType = RegistryServer.ClusterType.P2P;
         this.othersPeerServerNodes = othersPeerServerNodes;
+    }
+
+    public int getNextSize() {
+        return nextSize;
+    }
+
+    public void setNextSize(int nextSize) {
+        this.nextSize = nextSize;
+    }
+
+    public int getClientSubExecutors() {
+        return clientSubExecutors;
+    }
+
+    public void setClientSubExecutors(int clientSubExecutors) {
+        this.clientSubExecutors = clientSubExecutors;
     }
 }

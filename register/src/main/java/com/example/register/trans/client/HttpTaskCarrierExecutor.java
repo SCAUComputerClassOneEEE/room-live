@@ -1,11 +1,12 @@
-package com.example.register.trans;
+package com.example.register.trans.client;
 
 import com.example.register.serviceInfo.InstanceInfo;
-
+import com.example.register.serviceInfo.ServiceProvider;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -13,30 +14,35 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpVersion;
 
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 /**
+ *
+ * 只用于发送 http 请求
  * @author hiluyx
  * @since 2021/6/19 16:47
  **/
-public class HttpTaskCarrierExecutor implements Runnable {
-    private Channel httpChannel; // how
-    private InstanceInfo instanceInfo; // where
+public class HttpTaskCarrierExecutor {
+    private Bootstrap bootstrap; // how
+
+    private ServiceProvider provider; // where
+
     private FullHttpRequest httpRequest; // for what
-    private ChannelFutureListener doneListener;
 
     private HttpTaskCarrierExecutor() {}
 
+    public FullHttpRequest getHttpRequest() {
+        return httpRequest;
+    }
+
     public static class Builder {
 
-        // there are some read-only or write listener...
-
         private Bootstrap builderBootstrap;
-        private InstanceInfo builderInfo;
+        private ServiceProvider provider;
         private FullHttpRequest builderRequest;
         private ByteBuf bodyBuf;
-        private ChannelFutureListener builderListener;
 
-        public Builder builder() { return new Builder(); }
+        public static Builder builder() { return new Builder(); }
 
         private Builder() { }
 
@@ -45,8 +51,8 @@ public class HttpTaskCarrierExecutor implements Runnable {
             return this;
         }
 
-        public Builder connectWith(String ip, int port) {
-            builderInfo = new InstanceInfo(ip, port);
+        public Builder connectWith(ServiceProvider provider) {
+            this.provider = provider;
             return this;
         }
 
@@ -62,40 +68,28 @@ public class HttpTaskCarrierExecutor implements Runnable {
             return this;
         }
 
-        public Builder operatedCompletelyWith(ChannelFutureListener listener) {
-            builderListener = listener;
-            return this;
-        }
 
         public HttpTaskCarrierExecutor create() {
             final HttpTaskCarrierExecutor target = new HttpTaskCarrierExecutor();
 
-            String ip = builderInfo.getInstAdr().getIp();
-            int port = builderInfo.getInstAdr().getPort();
             builderRequest.replace(bodyBuf);
 
-            target.httpChannel = builderBootstrap.connect(ip, port).channel();
-            target.instanceInfo = builderInfo;
+            target.bootstrap = builderBootstrap;
+            target.provider = provider;
             target.httpRequest = builderRequest;
-            target.doneListener = builderListener;
             return target;
         }
     }
 
-    @Override
-    public void run() {
-        while (true) { // sync
-            if (httpChannel != null) {
-                final Channel channel = httpChannel;
-                try {
-                    channel.writeAndFlush(httpRequest).sync().addListener(doneListener);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    channel.close();
-                }
-                break;
-            }
+    // send
+    public void connectAndSend() {
+        try {
+            ChannelFuture sync = bootstrap.connect(provider.getInfo().host(), provider.getInfo().port()).sync();
+            httpRequest.headers().add("taskId", UUID.randomUUID().toString());
+            httpRequest.headers().add("startTime", System.currentTimeMillis());
+            sync.channel().writeAndFlush(httpRequest);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

@@ -1,10 +1,9 @@
 package com.example.register.serviceInfo;
 
-import java.util.Collection;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  *
@@ -15,26 +14,22 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ServiceApplicationsTable {
 
     public static final String SERVER_PEER_NODE = "server-peer-node-service";
+    public static final String CLIENT_APPLICATION = "client-application";
 
-    private static final ConcurrentHashMap<String, ConcurrentHashMap<Long, ServiceProvider>> doubleMarkMap = new ConcurrentHashMap<>();
-
-    public ServiceApplicationsTable(Long selfLong, String selfAppName, ServiceProvider selfNode) {
-        ConcurrentHashMap<Long, ServiceProvider> selfServiceMap = new ConcurrentHashMap<>();
-        selfServiceMap.put(selfLong, selfNode);
-        doubleMarkMap.put(selfAppName, selfServiceMap);
-    }
+    private static final ConcurrentHashMap<String, ConcurrentSkipListSet<ServiceProvider>> doubleMarkMap = new ConcurrentHashMap<>();
 
     public ServiceApplicationsTable(ServiceProvidersBootConfig config, /*初始化时候的服务列表*/
-                                    Long selfLong, /*自己的long*/
                                     String selfAppName/*自己的appName*/) {
         ServiceProvider selfNode = config.getSelfNode();
-        ConcurrentHashMap<Long, ServiceProvider> selfServiceMap = new ConcurrentHashMap<>();
-        selfServiceMap.put(selfLong, selfNode);
-        doubleMarkMap.put(selfAppName, selfServiceMap);
+        ConcurrentSkipListSet<ServiceProvider> selfSet = new ConcurrentSkipListSet<>(config.getTableSetRankComparator());
+        selfSet.add(selfNode);
+        doubleMarkMap.put(selfAppName, selfSet);
 
-        ConcurrentHashMap<Long, ServiceProvider> serverServiceMap = new ConcurrentHashMap<>();
-        config.getOthersPeerServerNodes().forEach((op)-> serverServiceMap.put(new Date().getTime(), op));
-        doubleMarkMap.put(SERVER_PEER_NODE, serverServiceMap);
+        ConcurrentSkipListSet<ServiceProvider> othersSet = new ConcurrentSkipListSet<>(config.getTableSetRankComparator());
+        List<ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
+        if (othersPeerServerNodes != null)
+            othersSet.addAll(othersPeerServerNodes);
+        doubleMarkMap.put(SERVER_PEER_NODE, othersSet);
     }
 
     public void remove(ServiceProvider.TypeServiceProvider type, String appName) {
@@ -51,22 +46,32 @@ public class ServiceApplicationsTable {
      * @return servers for notifying
      */
     public Iterator<ServiceProvider> getServers() {
-        ConcurrentHashMap<Long, ServiceProvider> servers = doubleMarkMap.get(SERVER_PEER_NODE);
-        Collection<ServiceProvider> values = servers.values();
-        return values.iterator();
+        return get(SERVER_PEER_NODE);
     }
 
     /**
      *
      *
      * @param appName app name
-     * @param selfLong self app long
      * @return app service
      */
-    public ServiceProvider get(String appName, long selfLong) {
-        final ConcurrentHashMap<Long, ServiceProvider> appMap = doubleMarkMap.get(appName);
-        if (appMap == null)
+    public Iterator<ServiceProvider> get(String appName) {
+        ConcurrentSkipListSet<ServiceProvider> appSet = doubleMarkMap.get(appName);
+        if (appSet == null)
             return null;
-        return appMap.get(selfLong);
+        if (appSet.isEmpty()) return null;
+        return appSet.iterator();
+    }
+
+    public static ServiceProvider getOneByMask(Iterator<ServiceProvider> iterator, int mask) {
+        ServiceProvider s = null;
+        while (iterator.hasNext()) {
+            if (iterator.next().mask() == mask) {
+                s = iterator.next();
+                break;
+            }
+            iterator.remove();
+        }
+        return s;
     }
 }

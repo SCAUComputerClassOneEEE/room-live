@@ -9,14 +9,22 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
 
-public class HttpClientHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
+public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
 
     private RegistryClient app;
 
-    public HttpClientHandler(RegistryClient app) {
+    public HttpClientInBoundHandler(RegistryClient app) {
         this.app = app;
     }
 
+    /**
+     *
+     * 根据server返回的结果的内容进行处理
+     * 200 操作成功并完成所有流程
+     * 300
+     * 404
+     * 500
+     */
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullHttpResponse) throws Exception {
 

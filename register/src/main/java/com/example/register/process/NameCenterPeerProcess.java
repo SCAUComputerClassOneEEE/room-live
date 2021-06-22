@@ -8,8 +8,6 @@ import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.server.ApplicationServer;
 
-import javax.naming.directory.AttributeModificationException;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
@@ -22,12 +20,7 @@ import java.util.List;
 public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
 
     private static final NameCenterPeerProcess INSTANCE = new NameCenterPeerProcess();
-    private static final Long myself;
     private static ServiceApplicationsTable table;
-
-    static {
-        myself = new Date().getTime();
-    }
 
     private ApplicationClient client;
     private ApplicationServer server;
@@ -64,11 +57,13 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
         if (config.getServerClusterType().equals(ClusterType.SINGLE)) {
             // othersPeerServerNodes == null
             table = new ServiceApplicationsTable(
-                    myself, ServiceApplicationsTable.SERVER_PEER_NODE, config.getSelfNode());
+                    config,
+                    ServiceApplicationsTable.SERVER_PEER_NODE);
 
         } else {
             table = new ServiceApplicationsTable(
-                config, myself, ServiceApplicationsTable.SERVER_PEER_NODE);
+                    config,
+                    ServiceApplicationsTable.SERVER_PEER_NODE);
             List<ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
             for (ServiceProvider othersPeerServerNode : othersPeerServerNodes) {
                 if (syncAll(othersPeerServerNode)) break;
@@ -82,11 +77,14 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
 
         }
 
-        client = new ApplicationClient(config.getTaskQueueMaxSize());
+        client = new ApplicationClient(config.getTaskQueueMaxSize(), config.getNextSize());
         server = new ApplicationServer();
         // initialize the client and server's thread worker for working.
         client.init(this);
         server.init(this);
+
+        client.start();
+        server.start();
     }
 
     /**
@@ -147,6 +145,15 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
     @Override
     public boolean syncAll(ServiceProvider peerNode) {
         InstanceInfo info = peerNode.getInfo();
+        String url = "/syncAll";
+//        HttpTaskCarrierExecutor httpTaskCarrierExecutor = HttpTaskCarrierExecutor.Builder.builder()
+//                .byBootstrap((Bootstrap) client.getBootstrap())
+//                .access(HttpMethod.GET, url)
+//                .connectWith(peerNode)
+//                .withBody("")
+//                .operatedCompletelyWith(null)
+//                .create();
+//        while (!client.sub(httpTaskCarrierExecutor));
         return true;
     }
 

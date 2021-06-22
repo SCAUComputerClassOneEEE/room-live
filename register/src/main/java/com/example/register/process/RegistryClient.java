@@ -1,5 +1,9 @@
 package com.example.register.process;
 
+import com.example.register.trans.client.HttpTaskCarrierExecutor;
+
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  *
  *
@@ -10,7 +14,7 @@ package com.example.register.process;
  * 3. 暂停，主动停止服务，暂停对外提供服务
  * 4. 下线，被动停止服务，一般是进程挂掉续约断了
  */
-public interface RegistryClient extends Application{
+public interface RegistryClient extends Application {
 
     /**
      *
