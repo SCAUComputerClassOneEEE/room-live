@@ -16,9 +16,9 @@ public class HttpClientOutBoundHandler extends ChannelOutboundHandlerAdapter {
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        super.write(ctx, msg, promise);
         if (msg instanceof FullHttpRequest) {
-
+            FullHttpRequest msg1 = (FullHttpRequest) msg;
         }
+        super.write(ctx, msg, promise);
     }
 }

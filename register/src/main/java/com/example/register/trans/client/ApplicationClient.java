@@ -1,6 +1,5 @@
 package com.example.register.trans.client;
 
-import com.example.register.pools.HttpTaskExecutorPool;
 import com.example.register.process.Application;
 import com.example.register.process.RegistryClient;
 import com.example.register.trans.ApplicationThread;
@@ -12,8 +11,6 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -31,6 +28,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
     private EventLoopGroup clientNetWorkLoop;
 
     private static BlockingQueue<HttpTaskCarrierExecutor> mainQueue; // public level 1
+    private static BlockingQueue<HttpTaskCarrierExecutor> subQueue;
 
     private final int taskQueueMaxSize;
     private final int nextSize;
@@ -45,6 +43,8 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
 
     @Override
     public void init(Application application) throws Exception {
+        if (this.isAlive()) return;
+
         if (application instanceof RegistryClient) {
             app = (RegistryClient) application;
         } else {
@@ -67,19 +67,26 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
                 });
 
         mainQueue = new LinkedBlockingQueue<>(taskQueueMaxSize);
-        runner.init(nextSize);
-        runner.setTaskQueue(mainQueue);
+        subQueue = new LinkedBlockingQueue<>(nextSize);
+        runner.init(mainQueue, subQueue);
     }
 
     @Override
     public void stopThread() {
-        runner.interrupt();
+//        runner.interrupt();
+        if (!this.isAlive()) return;
+
+        this.interrupt();
         if (!clientNetWorkLoop.isTerminated()) {
             clientNetWorkLoop.shutdownGracefully();
         }
+        mainQueue.clear();
+        subQueue.clear();
     }
 
-    public boolean subTask(HttpTaskCarrierExecutor executor) {
+    public boolean subTask(HttpTaskCarrierExecutor executor) throws Exception {
+        if (!this.isAlive())
+            throw new Exception("Client thread was interrupted.");
         return mainQueue.add(executor);
     }
 

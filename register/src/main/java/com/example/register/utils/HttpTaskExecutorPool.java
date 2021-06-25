@@ -1,10 +1,16 @@
-package com.example.register.pools;
+package com.example.register.utils;
 
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
 
 import java.util.concurrent.*;
 
+/**
+ *
+ * 线程池和等待结果的任务池
+ */
 public class HttpTaskExecutorPool extends ThreadPoolExecutor {
+
+    public static final ConcurrentHashMap<String, HttpTaskCarrierExecutor> taskMap = new ConcurrentHashMap<>();
 
     private static final int DEFAULT_CORE_SIZE = 2;
     private static final int DEFAULT_MAX_SIZE = 10;

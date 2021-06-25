@@ -1,13 +1,14 @@
 package com.example.register.trans.client;
 
+import com.example.register.utils.HttpTaskExecutorPool;
 import com.example.register.process.RegistryClient;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
-import io.netty.util.CharsetUtil;
+import io.netty.util.internal.ObjectUtil;
+import io.netty.util.internal.StringUtil;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
 
@@ -27,6 +28,16 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
      */
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullHttpResponse) throws Exception {
+        final ConcurrentHashMap<String, HttpTaskCarrierExecutor> taskMap = HttpTaskExecutorPool.taskMap;
+        String taskId = fullHttpResponse.headers().get("taskId");
 
+        if (StringUtil.isNullOrEmpty(taskId))
+            throw new RuntimeException("taskId is null or empty");
+        HttpTaskCarrierExecutor executor = taskMap.get(taskId);
+
+        ObjectUtil.checkNotNull(executor, "map haven't this task" + taskId);
+        executor.setResult(fullHttpResponse);
+
+        taskMap.remove(taskId);
     }
 }

@@ -1,13 +1,13 @@
 package com.example.register.trans.client;
 
 
-import com.example.register.pools.HttpTaskExecutorPool;
+import com.example.register.utils.HttpTaskExecutorPool;
 
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
 public class HttpTaskQueueConsumer implements Runnable{
     private static BlockingQueue<HttpTaskCarrierExecutor> taskQueue;
+    private static final HttpTaskExecutorPool pool = HttpTaskExecutorPool.getInstance();
 
     private Thread thread;
 
@@ -42,23 +42,22 @@ public class HttpTaskQueueConsumer implements Runnable{
     }
 
     private void doPacket() {
-        for (HttpTaskCarrierExecutor executor : (HttpTaskCarrierExecutor[]) selfNextTaskQueue.toArray()) {
-            HttpTaskExecutorPool.getInstance().submit0(executor::connectAndSend);
-        }
+        HttpTaskCarrierExecutor[] httpTaskCarrierExecutors = (HttpTaskCarrierExecutor[]) selfNextTaskQueue.toArray();
+        pool.submit0(() -> {
+            for (HttpTaskCarrierExecutor executor : httpTaskCarrierExecutors)
+                executor.connectAndSend();
+        });
     }
 
-    public void init(int nextSize) {
-        selfNextTaskQueue = new LinkedBlockingQueue<>(nextSize);
+    public void init(BlockingQueue<HttpTaskCarrierExecutor> mainQueue, BlockingQueue<HttpTaskCarrierExecutor> subQueue) {
+        taskQueue = mainQueue;
+        selfNextTaskQueue = subQueue;
     }
-
-    public void setTaskQueue(BlockingQueue<HttpTaskCarrierExecutor> tQueue) {
-        taskQueue = tQueue;
-    }
-
-    public void interrupt() {
-        if (thread != null && thread.isAlive())
-            thread.interrupt();
-    }
+//
+//    public void interrupt() {
+//        if (thread != null && thread.isAlive())
+//            thread.interrupt();
+//    }
 
     public Thread getThread() {
         return thread;

@@ -13,9 +13,14 @@ import java.util.concurrent.atomic.AtomicLong;
 public class InstanceInfo {
 
     private ConcatAddress instAdr;
-    private final AtomicLong version = new AtomicLong(0);
+    private AtomicLong version;
+
+    public InstanceInfo() {
+        version = new AtomicLong(0);
+    }
 
     public InstanceInfo(String host, int port) {
+        version = new AtomicLong(0);
         instAdr = new ConcatAddress(host, port);
     }
 
@@ -57,6 +62,9 @@ public class InstanceInfo {
     public static class ConcatAddress {
         public String ip;
         public int port;
+
+        public ConcatAddress() {
+        }
 
         public ConcatAddress(String ip, int port) {
             this.ip = ip;

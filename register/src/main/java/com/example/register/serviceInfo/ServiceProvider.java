@@ -3,45 +3,51 @@ package com.example.register.serviceInfo;
 
 import com.google.common.util.concurrent.AtomicDouble;
 
+import java.io.Serializable;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ServiceProvider {
-
-    public static class LeastConnectionComparator implements Comparator<ServiceProvider> {
-        @Override
-        public int compare(ServiceProvider o1, ServiceProvider o2) {
-            return o1.connectingInt.get() > o2.connectingInt.get() ? 0 : 1;
-        }
-    }
-
-    public static class FastestResponseComparator implements Comparator<ServiceProvider> {
-        @Override
-        public int compare(ServiceProvider o1, ServiceProvider o2) {
-            return o1.avgAccess.get() > o2.avgAccess.get() ? 0 : 1;
-        }
-    }
-
+public class ServiceProvider implements Serializable {
 
     public enum TypeServiceProvider {
         Client,
         Server,
     }
 
+    private String appName;
+
     private InstanceInfo info;
 
     private TypeServiceProvider type;
 
-    private final AtomicInteger connectingInt = new AtomicInteger(0); // 正在连接数
+    private AtomicInteger connectingInt; // 正在连接数
 
-    private final AtomicInteger historyInt = new AtomicInteger(0); // 历史连接数
+    private AtomicInteger historyInt; // 历史连接数
 
-    private final AtomicDouble avgAccess = new AtomicDouble(0.0); // 平均响应时间
+    private AtomicDouble avgAccess; // 平均响应时间
 
-    public ServiceProvider(String host, int port, TypeServiceProvider type) {
+    public ServiceProvider() {
+        connectingInt = new AtomicInteger(0);
+        historyInt = new AtomicInteger(0);
+        avgAccess = new AtomicDouble(0.0);
+    }
+
+    public ServiceProvider(String appName, String host, int port, TypeServiceProvider type) {
+        this.appName = appName;
         info = new InstanceInfo(host, port);
         this.type = type;
+        connectingInt = new AtomicInteger(0);
+        historyInt = new AtomicInteger(0);
+        avgAccess = new AtomicDouble(0.0);
+    }
+
+    public String getAppName() {
+        return appName;
+    }
+
+    public void setAppName(String appName) {
+        this.appName = appName;
     }
 
     public InstanceInfo getInfo() {
@@ -60,11 +66,36 @@ public class ServiceProvider {
         this.type = type;
     }
 
+//    public int getConnectingInt() { return connectingInt.get(); }
+//
+//    public int getHistoryInt() { return historyInt.get(); }
+//
+//    public double getAvgAccess() { return avgAccess.doubleValue(); }
+//
+//    public void setConnectingInt(int i) { connectingInt.set(i); }
+//
+//    public void setHistoryInt(int i) { historyInt.set(i); }
+//
+//    public void setAvgAccess(double d) { avgAccess.set(d); }
 
     /*
      *
      * LB
      */
+
+    public static class LeastConnectionComparator implements Comparator<ServiceProvider> {
+        @Override
+        public int compare(ServiceProvider o1, ServiceProvider o2) {
+            return o1.connectingInt.get() > o2.connectingInt.get() ? 0 : 1;
+        }
+    }
+
+    public static class FastestResponseComparator implements Comparator<ServiceProvider> {
+        @Override
+        public int compare(ServiceProvider o1, ServiceProvider o2) {
+            return o1.avgAccess.get() > o2.avgAccess.get() ? 0 : 1;
+        }
+    }
 
     public int incrementConnectingInt() {
         historyInt.incrementAndGet();

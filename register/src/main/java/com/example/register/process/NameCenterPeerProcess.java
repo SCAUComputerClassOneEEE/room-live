@@ -6,7 +6,11 @@ import com.example.register.serviceInfo.ServiceApplicationsTable;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.client.ApplicationClient;
+import com.example.register.trans.client.HttpTaskCarrierExecutor;
 import com.example.register.trans.server.ApplicationServer;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpMethod;
 
 import java.util.Iterator;
 import java.util.List;
@@ -54,28 +58,9 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
     public void init(ServiceProvidersBootConfig config) throws Exception {
         // initialize the table with config and myself
 
-        if (config.getServerClusterType().equals(ClusterType.SINGLE)) {
-            // othersPeerServerNodes == null
-            table = new ServiceApplicationsTable(
-                    config,
-                    ServiceApplicationsTable.SERVER_PEER_NODE);
-
-        } else {
-            table = new ServiceApplicationsTable(
-                    config,
-                    ServiceApplicationsTable.SERVER_PEER_NODE);
-            List<ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
-            for (ServiceProvider othersPeerServerNode : othersPeerServerNodes) {
-                if (syncAll(othersPeerServerNode)) break;
-            }
-            Iterator<ServiceProvider> servers = table.getServers();
-
-            while (servers.hasNext()) {
-                if (syncAll(servers.next())) break;
-                servers.remove();
-            }
-
-        }
+        table = new ServiceApplicationsTable(
+                config,
+                ServiceApplicationsTable.SERVER_PEER_NODE);
 
         client = new ApplicationClient(config.getTaskQueueMaxSize(), config.getNextSize());
         server = new ApplicationServer();
@@ -85,6 +70,15 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
 
         client.start();
         server.start();
+
+        if (config.getServerClusterType().equals(ClusterType.P2P)) {
+            Iterator<ServiceProvider> servers = table.getServers();
+
+            while (servers.hasNext()) {
+                if (syncAll(servers.next())) break;
+                servers.remove();
+            }
+        }
     }
 
     /**
@@ -143,17 +137,19 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
     }
 
     @Override
-    public boolean syncAll(ServiceProvider peerNode) {
-        InstanceInfo info = peerNode.getInfo();
+    public boolean syncAll(ServiceProvider peerNode) throws Exception {
         String url = "/syncAll";
-//        HttpTaskCarrierExecutor httpTaskCarrierExecutor = HttpTaskCarrierExecutor.Builder.builder()
-//                .byBootstrap((Bootstrap) client.getBootstrap())
-//                .access(HttpMethod.GET, url)
-//                .connectWith(peerNode)
-//                .withBody("")
-//                .operatedCompletelyWith(null)
-//                .create();
-//        while (!client.sub(httpTaskCarrierExecutor));
+        HttpTaskCarrierExecutor httpTaskCarrierExecutor = HttpTaskCarrierExecutor.Builder.builder()
+                .byBootstrap((Bootstrap) client.getBootstrap())
+                .access(HttpMethod.GET, url)
+                .connectWith(peerNode)
+                .withBody("")
+                .create();
+        while (true) {
+            if (client.subTask(httpTaskCarrierExecutor)) break;
+        }
+        FullHttpResponse fullHttpResponse = httpTaskCarrierExecutor.syncGetAndTimeOutRemove(0, 50);
+
         return true;
     }
 

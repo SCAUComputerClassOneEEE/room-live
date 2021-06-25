@@ -1,19 +1,22 @@
 package com.example.register.trans.client;
 
 import com.example.register.serviceInfo.InstanceInfo;
+import com.example.register.serviceInfo.ServiceApplicationsTable;
 import com.example.register.serviceInfo.ServiceProvider;
+import com.example.register.utils.HttpTaskExecutorPool;
+import com.example.register.utils.JSONUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.*;
+import io.netty.util.internal.ObjectUtil;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -29,6 +32,10 @@ public class HttpTaskCarrierExecutor {
 
     private FullHttpRequest httpRequest; // for what
 
+    private FullHttpResponse result;
+
+    private String taskId;
+
     private HttpTaskCarrierExecutor() {}
 
     public FullHttpRequest getHttpRequest() {
@@ -36,11 +43,11 @@ public class HttpTaskCarrierExecutor {
     }
 
     public static class Builder {
-
         private Bootstrap builderBootstrap;
-        private ServiceProvider provider;
+        private ServiceProvider builderProvider;
         private FullHttpRequest builderRequest;
         private ByteBuf bodyBuf;
+        private HttpHeaders builderHeaders;
 
         public static Builder builder() { return new Builder(); }
 
@@ -52,7 +59,20 @@ public class HttpTaskCarrierExecutor {
         }
 
         public Builder connectWith(ServiceProvider provider) {
-            this.provider = provider;
+            this.builderProvider = provider;
+            return this;
+        }
+
+        /**
+         *
+         *
+         * 不要在这里添加自动生成的taskId
+         */
+        public Builder addHeader(String h, Object o) {
+            if (builderHeaders == null) {
+                builderHeaders = new DefaultHttpHeaders();
+            }
+            builderHeaders.add(h, o);
             return this;
         }
 
@@ -74,9 +94,14 @@ public class HttpTaskCarrierExecutor {
 
             builderRequest.replace(bodyBuf);
 
+            ObjectUtil.checkNotNull(builderBootstrap, "builderProvider is null");
+            ObjectUtil.checkNotNull(builderProvider, "builderProvider is null");
+            ObjectUtil.checkNotNull(builderRequest, "builderRequest is null");
+
             target.bootstrap = builderBootstrap;
-            target.provider = provider;
+            target.provider = builderProvider;
             target.httpRequest = builderRequest;
+            target.httpRequest.headers().add(builderHeaders);
             return target;
         }
     }
@@ -85,11 +110,41 @@ public class HttpTaskCarrierExecutor {
     public void connectAndSend() {
         try {
             ChannelFuture sync = bootstrap.connect(provider.getInfo().host(), provider.getInfo().port()).sync();
-            httpRequest.headers().add("taskId", UUID.randomUUID().toString());
-            httpRequest.headers().add("startTime", System.currentTimeMillis());
+            taskId = UUID.randomUUID().toString();
+            httpRequest.headers().add("taskId", taskId);
             sync.channel().writeAndFlush(httpRequest);
+
+            //
+            HttpTaskExecutorPool.taskMap.put(taskId, this);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public FullHttpResponse syncGetAndTimeOutRemove(long timeOut, long perWaitMils) throws InterruptedException, IOException {
+        long start = System.currentTimeMillis();
+        Thread.sleep(perWaitMils);
+        while (result == null) {
+            long now = System.currentTimeMillis();
+            if (timeOut == 0) continue;
+            if (now - start > timeOut) {
+                // time out and then remove
+                HttpTaskExecutorPool.taskMap.remove(taskId);
+                break;
+            }
+        }
+
+        ByteBuf content = result.content();
+        byte[] array = content.array();
+
+        String s = new String(array);
+
+        JSONUtil.readValue(s, ServiceApplicationsTable.class);
+
+        return result;
+    }
+
+    public void setResult(FullHttpResponse result) {
+        this.result = result;
     }
 }
