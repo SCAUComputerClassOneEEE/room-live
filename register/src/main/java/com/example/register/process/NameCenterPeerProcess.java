@@ -8,10 +8,13 @@ import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
 import com.example.register.trans.server.ApplicationServer;
+import com.example.register.utils.JSONUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
@@ -148,8 +151,15 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
         while (true) {
             if (client.subTask(httpTaskCarrierExecutor)) break;
         }
-        FullHttpResponse fullHttpResponse = httpTaskCarrierExecutor.syncGetAndTimeOutRemove(0, 50);
+        /*List<ServiceProvider>*/
+        String peerTables = httpTaskCarrierExecutor.syncGetAndTimeOutRemove(0, 50);
 
+        try {
+            List<ServiceProvider> serviceProviders = JSONUtil.readListValue(peerTables, new TypeReference<List<ServiceProvider>>() {});
+        } catch (IOException ioException) {
+
+            return false;
+        }
         return true;
     }
 

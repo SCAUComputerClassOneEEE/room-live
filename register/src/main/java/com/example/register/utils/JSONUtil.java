@@ -1,12 +1,14 @@
 package com.example.register.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.netty.util.internal.StringUtil;
 
 import java.io.IOException;
+import java.util.List;
 
 public class JSONUtil {
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -24,5 +26,9 @@ public class JSONUtil {
 
     public static String writeValue(Object o) throws JsonProcessingException {
         return mapper.writeValueAsString(o);
+    }
+
+    public static <T> List<T> readListValue(String str, TypeReference<List<T>> typeReference) throws IOException {
+        return mapper.readValue(str, typeReference);
     }
 }

@@ -121,7 +121,7 @@ public class HttpTaskCarrierExecutor {
         }
     }
 
-    public FullHttpResponse syncGetAndTimeOutRemove(long timeOut, long perWaitMils) throws InterruptedException, IOException {
+    public String syncGetAndTimeOutRemove(long timeOut, long perWaitMils) throws InterruptedException {
         long start = System.currentTimeMillis();
         Thread.sleep(perWaitMils);
         while (result == null) {
@@ -137,11 +137,7 @@ public class HttpTaskCarrierExecutor {
         ByteBuf content = result.content();
         byte[] array = content.array();
 
-        String s = new String(array);
-
-        JSONUtil.readValue(s, ServiceApplicationsTable.class);
-
-        return result;
+        return new String(array);
     }
 
     public void setResult(FullHttpResponse result) {

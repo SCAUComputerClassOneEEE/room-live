@@ -3,36 +3,31 @@ package com.example.register;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.utils.JSONUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 
 class ServiceCenterPeerClientTests {
 
-
-    void contextLoads() {
-
-    }
-
     public static void main(String[] args) throws IOException {
         ServiceProvider localhost = new ServiceProvider("aa", "localhost", 8080, ServiceProvider.TypeServiceProvider.Server);
-        localhost.incrementConnectingInt();
-        localhost.incrementConnectingInt();
-        localhost.incrementConnectingInt();
-        localhost.fixAccessAvg(77.0);
-        localhost.fixAccessAvg(76.0);
-        localhost.fixAccessAvg(75.0);
+        ServiceProvider localhost1 = new ServiceProvider("bb", "localhost", 8080, ServiceProvider.TypeServiceProvider.Server);
+        ServiceProvider localhost2 = new ServiceProvider("cc", "localhost", 8080, ServiceProvider.TypeServiceProvider.Server);
+        ServiceProvider localhost3 = new ServiceProvider("dd", "localhost", 8080, ServiceProvider.TypeServiceProvider.Server);
+        List<ServiceProvider> list = new ArrayList<>();
+        list.add(localhost);
+        list.add(localhost1);
+        list.add(localhost2);
+        list.add(localhost3);
 
-
-        String s = JSONUtil.writeValue(localhost);
+        String s = JSONUtil.writeValue(list);
 
         System.out.println(s);
-        ServiceProvider serviceProvider = JSONUtil.readValue(s, ServiceProvider.class);
-        serviceProvider.getInfo().incrementVersion();
-
-        String s1 = JSONUtil.writeValue(serviceProvider);
-
-        System.out.println(s1);
+        List<ServiceProvider> serviceProviders = JSONUtil.readListValue(s, new TypeReference<List<ServiceProvider>>() {});
+        System.out.println();
 
     }
 

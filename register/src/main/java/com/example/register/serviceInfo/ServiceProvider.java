@@ -66,18 +66,6 @@ public class ServiceProvider implements Serializable {
         this.type = type;
     }
 
-//    public int getConnectingInt() { return connectingInt.get(); }
-//
-//    public int getHistoryInt() { return historyInt.get(); }
-//
-//    public double getAvgAccess() { return avgAccess.doubleValue(); }
-//
-//    public void setConnectingInt(int i) { connectingInt.set(i); }
-//
-//    public void setHistoryInt(int i) { historyInt.set(i); }
-//
-//    public void setAvgAccess(double d) { avgAccess.set(d); }
-
     /*
      *
      * LB

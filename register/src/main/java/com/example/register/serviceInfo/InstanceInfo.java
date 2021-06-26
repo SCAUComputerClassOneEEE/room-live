@@ -1,5 +1,7 @@
 package com.example.register.serviceInfo;
 
+import java.sql.Timestamp;
+import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -10,17 +12,17 @@ import java.util.concurrent.atomic.AtomicLong;
  * 2. 版本号
  * 3. 。。。
  */
-public class InstanceInfo {
+public class InstanceInfo implements Comparable<InstanceInfo>{
 
     private ConcatAddress instAdr;
-    private AtomicLong version;
+    private final Timestamp version;
 
     public InstanceInfo() {
-        version = new AtomicLong(0);
+        version = new Timestamp(new Date().getTime());
     }
 
     public InstanceInfo(String host, int port) {
-        version = new AtomicLong(0);
+        version = new Timestamp(new Date().getTime());
         instAdr = new ConcatAddress(host, port);
     }
 
@@ -29,12 +31,12 @@ public class InstanceInfo {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         InstanceInfo that = (InstanceInfo) o;
-        return Objects.equals(instAdr, that.instAdr) && version.get() == that.version.get();
+        return Objects.equals(instAdr, that.instAdr) && version.equals(that.version);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(instAdr, version.get());
+        return Objects.hash(instAdr, version);
     }
 
     public String host() {
@@ -54,10 +56,13 @@ public class InstanceInfo {
     }
 
     public long getVersion() {
-        return version.get();
+        return version.getTime();
     }
 
-    public long incrementVersion() { return version.incrementAndGet(); }
+    @Override
+    public int compareTo(InstanceInfo o) {
+        return this.version.compareTo(o.version);
+    }
 
     public static class ConcatAddress {
         public String ip;
