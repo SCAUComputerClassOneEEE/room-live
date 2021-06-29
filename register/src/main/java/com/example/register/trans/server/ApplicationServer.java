@@ -2,6 +2,7 @@ package com.example.register.trans.server;
 
 import com.example.register.process.Application;
 import com.example.register.process.RegistryServer;
+import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.ApplicationThread;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -10,6 +11,9 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.timeout.WriteTimeoutHandler;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author hiluyx
@@ -30,14 +34,14 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
     }
 
     @Override
-    public void init(Application application) throws Exception {
+    public void init(Application application, ServiceProvidersBootConfig config) throws Exception {
         if (application instanceof RegistryServer) {
             app = (RegistryServer) application;
         } else {
             throw new Exception("server application thread init error.");
         }
         bootstrap = new ServerBootstrap();
-
+        final Integer writeTimeOut = config.getWriteTimeOut();
         ((ServerBootstrap)bootstrap)
                 .group(boosGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
@@ -46,6 +50,7 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline()
+                                .addLast(new WriteTimeoutHandler(writeTimeOut, TimeUnit.MILLISECONDS))
                                 .addLast(new HttpServerCodec())
                                 .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
                                 .addLast(new HttpServerHandler(app));

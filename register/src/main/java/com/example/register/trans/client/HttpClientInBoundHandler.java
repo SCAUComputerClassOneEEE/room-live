@@ -2,9 +2,11 @@ package com.example.register.trans.client;
 
 import com.example.register.utils.HttpTaskExecutorPool;
 import com.example.register.process.RegistryClient;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
@@ -36,8 +38,25 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
         HttpTaskCarrierExecutor executor = taskMap.get(taskId);
 
         ObjectUtil.checkNotNull(executor, "map haven't this task" + taskId);
-        executor.setResult(fullHttpResponse);
+        executor.setResult(new HttpTaskCarrierExecutor.TaskExecuteResult(fullHttpResponse));
 
         taskMap.remove(taskId);
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        super.userEventTriggered(ctx, evt);
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        if (cause instanceof ReadTimeoutException) {
+            // read time out
+            HttpClientOutBoundHandler taskOutHandler = (HttpClientOutBoundHandler)ctx.pipeline().get("task out handler");
+            HttpTaskCarrierExecutor executor = HttpTaskExecutorPool.taskMap.get(taskOutHandler.getTaskId());
+            executor.setResult(new HttpTaskCarrierExecutor.TaskExecuteResult(0));
+        } else {
+            super.exceptionCaught(ctx, cause);
+        }
     }
 }

@@ -32,7 +32,7 @@ public class HttpTaskCarrierExecutor {
 
     private FullHttpRequest httpRequest; // for what
 
-    private FullHttpResponse result;
+    private volatile TaskExecuteResult result;
 
     private String taskId;
 
@@ -48,6 +48,7 @@ public class HttpTaskCarrierExecutor {
         private FullHttpRequest builderRequest;
         private ByteBuf bodyBuf;
         private HttpHeaders builderHeaders;
+        private String taskId;
 
         public static Builder builder() { return new Builder(); }
 
@@ -72,6 +73,8 @@ public class HttpTaskCarrierExecutor {
             if (builderHeaders == null) {
                 builderHeaders = new DefaultHttpHeaders();
             }
+            if (h.equals("taskId"))
+                taskId = (String)o;
             builderHeaders.add(h, o);
             return this;
         }
@@ -102,45 +105,73 @@ public class HttpTaskCarrierExecutor {
             target.provider = builderProvider;
             target.httpRequest = builderRequest;
             target.httpRequest.headers().add(builderHeaders);
+            target.taskId = taskId;
             return target;
         }
+    }
+
+    public static class TaskExecuteResult {
+        /*
+        -1 connect time out;
+         0 read time out;
+         ------ result is null
+         1 success;
+         */
+        private int state;
+        private FullHttpResponse result;
+
+        public TaskExecuteResult(FullHttpResponse result) {
+            state = 1;
+            this.result = result;
+        }
+
+        public TaskExecuteResult(int s) {
+            state = s;
+            result = null;
+        }
+
+        public boolean success() { return state == 1; }
+
+        public int getState() { return state; }
+
+        public void setState(int state) { this.state = state; }
+
+        public FullHttpResponse getResult() { return result; }
+
+        public void setResult(FullHttpResponse result) { this.result = result; }
     }
 
     // send
     public void connectAndSend() {
         try {
-            ChannelFuture sync = bootstrap.connect(provider.getInfo().host(), provider.getInfo().port()).sync();
-            taskId = UUID.randomUUID().toString();
-            httpRequest.headers().add("taskId", taskId);
+            ChannelFuture sync = bootstrap.connect(provider.getInfo().host(), provider.getInfo().port()).awaitUninterruptibly();
+            /*
+            connect time out
+             */
+            if (!sync.isSuccess()) {
+                result = new TaskExecuteResult(-1);
+                return;
+            }
             sync.channel().writeAndFlush(httpRequest);
-
-            //
-            HttpTaskExecutorPool.taskMap.put(taskId, this);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public String syncGetAndTimeOutRemove(long timeOut, long perWaitMils) throws InterruptedException {
-        long start = System.currentTimeMillis();
-        Thread.sleep(perWaitMils);
+    public String syncGetAndTimeOutRemove() {
         while (result == null) {
-            long now = System.currentTimeMillis();
-            if (timeOut == 0) continue;
-            if (now - start > timeOut) {
-                // time out and then remove
-                HttpTaskExecutorPool.taskMap.remove(taskId);
-                break;
-            }
+            if (result != null) break;
         }
+        if (!result.success())
+            return null;
 
-        ByteBuf content = result.content();
+        ByteBuf content = this.result.getResult().content();
         byte[] array = content.array();
 
         return new String(array);
     }
 
-    public void setResult(FullHttpResponse result) {
+    public void setResult(TaskExecuteResult result) {
         this.result = result;
     }
 }

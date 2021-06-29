@@ -1,5 +1,6 @@
 package com.example.register.process;
 
+import com.example.register.serviceInfo.ServiceApplicationsTable;
 import com.example.register.serviceInfo.ServiceProvider;
 
 /**
@@ -24,8 +25,8 @@ public interface RegistryServer extends Application {
      *
      * 从 peer 拉取全部数据
      */
-    boolean syncAll(ServiceProvider peerNode) throws Exception;
+    boolean syncAll(ServiceApplicationsTable table, ServiceProvider peerNode) throws Exception;
 
-    boolean isActive(ServiceProvider provider);
+    boolean isActive(ServiceProvider provider, boolean sync);
 
 }

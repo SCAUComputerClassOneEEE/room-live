@@ -10,7 +10,7 @@ import java.util.concurrent.*;
  */
 public class HttpTaskExecutorPool extends ThreadPoolExecutor {
 
-    public static final ConcurrentHashMap<String, HttpTaskCarrierExecutor> taskMap = new ConcurrentHashMap<>();
+    public static final ConcurrentHashMap<String/*taskId*/, HttpTaskCarrierExecutor> taskMap = new ConcurrentHashMap<>();
 
     private static final int DEFAULT_CORE_SIZE = 2;
     private static final int DEFAULT_MAX_SIZE = 10;

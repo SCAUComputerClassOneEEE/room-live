@@ -9,6 +9,11 @@ import io.netty.handler.codec.http.FullHttpRequest;
 public class HttpClientOutBoundHandler extends ChannelOutboundHandlerAdapter {
 
     private RegistryClient app;
+    private String taskId;
+
+    public String getTaskId() {
+        return taskId;
+    }
 
     public HttpClientOutBoundHandler(RegistryClient app) {
         this.app = app;
@@ -18,6 +23,8 @@ public class HttpClientOutBoundHandler extends ChannelOutboundHandlerAdapter {
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         if (msg instanceof FullHttpRequest) {
             FullHttpRequest msg1 = (FullHttpRequest) msg;
+
+            taskId = msg1.headers().get("taskId");
         }
         super.write(ctx, msg, promise);
     }

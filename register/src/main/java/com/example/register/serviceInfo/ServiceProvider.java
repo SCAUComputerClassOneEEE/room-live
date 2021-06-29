@@ -10,22 +10,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ServiceProvider implements Serializable {
 
-    public enum TypeServiceProvider {
-        Client,
-        Server,
-    }
-
     private String appName;
 
     private InstanceInfo info;
 
-    private TypeServiceProvider type;
+    private final AtomicInteger connectingInt; // 正在连接数
 
-    private AtomicInteger connectingInt; // 正在连接数
+    private final AtomicInteger historyInt; // 历史连接数
 
-    private AtomicInteger historyInt; // 历史连接数
-
-    private AtomicDouble avgAccess; // 平均响应时间
+    private final AtomicDouble avgAccess; // 平均响应时间
 
     public ServiceProvider() {
         connectingInt = new AtomicInteger(0);
@@ -33,10 +26,9 @@ public class ServiceProvider implements Serializable {
         avgAccess = new AtomicDouble(0.0);
     }
 
-    public ServiceProvider(String appName, String host, int port, TypeServiceProvider type) {
+    public ServiceProvider(String appName, String host, int port) {
         this.appName = appName;
         info = new InstanceInfo(host, port);
-        this.type = type;
         connectingInt = new AtomicInteger(0);
         historyInt = new AtomicInteger(0);
         avgAccess = new AtomicDouble(0.0);
@@ -56,14 +48,6 @@ public class ServiceProvider implements Serializable {
 
     public void setInfo(InstanceInfo info) {
         this.info = info;
-    }
-
-    public TypeServiceProvider getType() {
-        return type;
-    }
-
-    public void setType(TypeServiceProvider type) {
-        this.type = type;
     }
 
     /*
@@ -109,12 +93,12 @@ public class ServiceProvider implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ServiceProvider that = (ServiceProvider) o;
-        return info.equals(that.info) && type == that.type;
+        return info.equals(that.info);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(info, type);
+        return Objects.hash(info);
     }
 
     public int mask() {

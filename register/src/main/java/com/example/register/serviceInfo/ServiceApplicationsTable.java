@@ -14,7 +14,7 @@ import java.util.concurrent.CopyOnWriteArraySet;
 public class ServiceApplicationsTable {
 
     public static final String SERVER_PEER_NODE = "server-peer-node-service";
-    public static final String CLIENT_APPLICATION = "client-application";
+    public static final String DEFAULT_CLIENT_APPLICATION = "default_client-application";
 
     private static final ConcurrentHashMap<String, ConcurrentSkipListSet<ServiceProvider>> doubleMarkMap = new ConcurrentHashMap<>();
 
@@ -32,11 +32,15 @@ public class ServiceApplicationsTable {
         doubleMarkMap.put(SERVER_PEER_NODE, othersSet);
     }
 
-    public void remove(ServiceProvider.TypeServiceProvider type, String appName) {
+    public void remove(String appName) {
 
     }
 
-    public void put(String appName, String host, int port, ServiceProvider.TypeServiceProvider type) {
+    public void remove(ServiceProvider serviceProvider) {
+        ConcurrentSkipListSet<ServiceProvider> serviceProviders = doubleMarkMap.get(serviceProvider.getAppName());
+    }
+
+    public void put(String appName, String host, int port) {
 
     }
 

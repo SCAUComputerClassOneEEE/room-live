@@ -16,6 +16,9 @@ public class ServiceProvidersBootConfig {
     private int taskQueueMaxSize;
     private int nextSize;
     private int clientSubExecutors;
+    private int connectTimeOut;
+    private int readTimeOut;
+    private int writeTimeOut;
 
     private Comparator<ServiceProvider> tableSetRankComparator;
 
@@ -41,6 +44,30 @@ public class ServiceProvidersBootConfig {
 
     public void setTableSetRankComparator(Comparator<ServiceProvider> tableSetRankComparator) {
         this.tableSetRankComparator = tableSetRankComparator;
+    }
+
+    public int getConnectTimeOut() {
+        return connectTimeOut;
+    }
+
+    public void setConnectTimeOut(int connectTimeOut) {
+        this.connectTimeOut = connectTimeOut;
+    }
+
+    public int getReadTimeOut() {
+        return readTimeOut;
+    }
+
+    public void setReadTimeOut(int readTimeOut) {
+        this.readTimeOut = readTimeOut;
+    }
+
+    public int getWriteTimeOut() {
+        return writeTimeOut;
+    }
+
+    public void setWriteTimeOut(int writeTimeOut) {
+        this.writeTimeOut = writeTimeOut;
     }
 
     public ServiceProvider getSelfNode() {

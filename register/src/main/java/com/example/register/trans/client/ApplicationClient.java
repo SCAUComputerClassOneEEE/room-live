@@ -2,6 +2,7 @@ package com.example.register.trans.client;
 
 import com.example.register.process.Application;
 import com.example.register.process.RegistryClient;
+import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.ApplicationThread;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
@@ -10,9 +11,11 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  *
@@ -42,7 +45,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
     }
 
     @Override
-    public void init(Application application) throws Exception {
+    public void init(Application application, ServiceProvidersBootConfig config) throws Exception {
         if (this.isAlive()) return;
 
         if (application instanceof RegistryClient) {
@@ -53,16 +56,20 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
         bootstrap = new Bootstrap();
         clientNetWorkLoop = new NioEventLoopGroup();
         final Bootstrap boots = (Bootstrap)bootstrap;
+        final Integer connectTimeOut = config.getConnectTimeOut();
+        final Integer readTimeOut = config.getReadTimeOut();
         boots.group(clientNetWorkLoop)
                 .channel(NioSocketChannel.class)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeOut) // connect time out 3s
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline()
+                                .addLast(new ReadTimeoutHandler(readTimeOut, TimeUnit.MILLISECONDS)) // read time out 5s
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
-                                .addLast(new HttpClientInBoundHandler(app))
-                                .addLast(new HttpClientOutBoundHandler(app));
+                                .addLast("task in handler", new HttpClientInBoundHandler(app))
+                                .addLast("task out handler", new HttpClientOutBoundHandler(app));
                     }
                 });
 
@@ -89,5 +96,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             throw new Exception("Client thread was interrupted.");
         return mainQueue.add(executor);
     }
+
+
 
 }
