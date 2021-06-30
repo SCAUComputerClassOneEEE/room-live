@@ -43,7 +43,7 @@ public class HttpTaskQueueConsumer implements Runnable{
 
     private void doPacket() {
         HttpTaskCarrierExecutor[] httpTaskCarrierExecutors = (HttpTaskCarrierExecutor[]) selfNextTaskQueue.toArray();
-        pool.submit0(() -> {
+        pool.submit(() -> {
             for (HttpTaskCarrierExecutor executor : httpTaskCarrierExecutors)
                 executor.connectAndSend();
         });

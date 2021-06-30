@@ -7,11 +7,14 @@ import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
+import com.example.register.trans.client.HttpTaskDoneRunnable;
 import com.example.register.trans.server.ApplicationServer;
 import com.example.register.utils.HttpTaskExecutorPool;
 import com.example.register.utils.JSONUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.util.internal.StringUtil;
@@ -48,7 +51,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
     }
     /**
      *
-     *
+     * 只能对table的初始化和读，不能写！！！
      * 初始化，启动数据的远端同步
      * setup 0 从参数 config 中初始化 peers 列表
      *      -
@@ -82,26 +85,9 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
 
         if (config.getServerClusterType().equals(ClusterType.P2P)) {
             Iterator<ServiceProvider> servers = table.getServers();
-            /*
-             * peers all is active?
-             */
             while (servers.hasNext()) {
-                /*
-                * if one peer is inactive, remove from table
-                * */
-                if (!isActive(servers.next(), true)) {
-                    table.remove(servers.next());
-                }
+                if (syncAll(servers.next(), true)) break;
                 servers.remove();
-            }
-            Iterator<ServiceProvider> servers1 = table.getServers();
-            while (servers1.hasNext()) {
-                if (syncAll(table, servers1.next())) break;
-                servers1.remove();
-                /*
-                * because of server's inactivation
-                * table remove servers.next()
-                * */
             }
         }
 
@@ -137,7 +123,12 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
      * 该服务peer注册集群中到其他的peer中
      */
     @Override
-    public void register() {
+    public void register(ServiceProvider peerNode, ServiceProvider which, boolean sync) {
+
+    }
+
+    @Override
+    public void register(ServiceProvider peerNode, List<ServiceProvider> whichList, boolean sync) {
 
     }
 
@@ -168,42 +159,51 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
     }
 
     @Override
-    public boolean syncAll(ServiceApplicationsTable table, ServiceProvider peerNode) throws Exception {
-        boolean reB = true;
-        String url = "/syncAll";
-        List<ServiceProvider> serviceProviders;
-        String taskId = UUID.randomUUID().toString();
-        HttpTaskCarrierExecutor httpTaskCarrierExecutor = HttpTaskCarrierExecutor.Builder.builder()
+    public boolean syncAll(ServiceProvider peerNode, boolean sync) throws Exception {
+        if (!isActive(peerNode, true)) {
+            /*
+             * peers all is active?
+             */
+            return false;
+        }
+        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                 .byBootstrap((Bootstrap) client.getBootstrap())
-                .access(HttpMethod.GET, url)
+                .access(HttpMethod.GET, "/syncAll")
                 .connectWith(peerNode)
-                .addHeader("taskId", taskId)
-                .withBody("")
-                .create();
+                .addHeader("taskId", UUID.randomUUID().toString())
+                .done(new HttpTaskDoneRunnable() {
+                    @Override
+                    public void doneRun(HttpTaskCarrierExecutor executor) {
+                        if (executor.success()) {
+                            String peerTables = executor.getResultString();
+                            try {
+                                List<ServiceProvider> serviceProviders = JSONUtil.readListValue(peerTables,
+                                        new TypeReference<List<ServiceProvider>>() {});
+
+                                List<ServiceProvider> selfHigherList = table.compareAndUpdate(serviceProviders);
+                                if (!selfHigherList.isEmpty())
+                                    register(peerNode, selfHigherList, false);
+                            } catch (Exception e) {
+                                executor.setParseSuccess(false);
+                            }
+                        }
+                    }
+                }).withBody("").create();
         /*block to sub taskQueue*/
-        client.subTask(httpTaskCarrierExecutor);
-        HttpTaskExecutorPool.taskMap.put(taskId, httpTaskCarrierExecutor);
-
-        /*sync for List<ServiceProvider>*/
-        String peerTables = httpTaskCarrierExecutor.syncGetAndTimeOutRemove();
-        if (StringUtil.isNullOrEmpty(peerTables)) {
-            reB = false;
-        }
-
-        try {
-            serviceProviders = JSONUtil.readListValue(peerTables, new TypeReference<List<ServiceProvider>>() {});
-
-        } catch (IOException ioException) {
-            reB = false;
-        }
-        HttpTaskExecutorPool.taskMap.remove(taskId);
-        return reB;
+        client.subTask(executor);
+        if (sync)
+            executor.waitUtilDone();
+        else return false;
+        return executor.success() & executor.isParseSuccess();
     }
 
     @Override
     public boolean isActive(ServiceProvider provider, boolean sync) {
         String url = "isActive";
         String taskId = UUID.randomUUID().toString();
+        /*
+         * if one peer is inactive, remove from table
+         * */
         return false;
     }
 

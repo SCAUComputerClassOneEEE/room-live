@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 /**
  *
@@ -34,20 +36,25 @@ public class HttpTaskCarrierExecutor {
 
     private volatile TaskExecuteResult result;
 
+    private boolean parseSuccess;
+
     private String taskId;
 
-    /*
-    * 当这次http请求结束（收到inbound的response）之后的工作
-    * */
-    private ChannelFutureListener listener;
+    private HttpTaskDoneRunnable doneTodo;
+
+    private volatile Future<?> syncer;
 
     private HttpTaskCarrierExecutor() {}
 
-    public FullHttpRequest getHttpRequest() {
-        return httpRequest;
+    public void setSyncer(Future<?> syncer) {
+        this.syncer = syncer;
     }
 
-    public ChannelFutureListener getListener() { return listener; }
+    public boolean isParseSuccess() { return parseSuccess; }
+
+    public void setParseSuccess(boolean parseSuccess) { this.parseSuccess = parseSuccess; }
+
+    public Runnable getDoneTodo() { return doneTodo; }
 
     public static class Builder {
         private Bootstrap builderBootstrap;
@@ -55,7 +62,7 @@ public class HttpTaskCarrierExecutor {
         private FullHttpRequest builderRequest;
         private ByteBuf bodyBuf;
         private HttpHeaders builderHeaders;
-        private ChannelFutureListener builderListener;
+        private HttpTaskDoneRunnable builderRunnable;
         private String taskId;
 
         public static Builder builder() { return new Builder(); }
@@ -72,8 +79,8 @@ public class HttpTaskCarrierExecutor {
             return this;
         }
 
-        public Builder doneListener(ChannelFutureListener listener) {
-            builderListener = listener;
+        public Builder done(HttpTaskDoneRunnable runnable) {
+            builderRunnable = runnable;
             return this;
         }
 
@@ -107,6 +114,7 @@ public class HttpTaskCarrierExecutor {
             final HttpTaskCarrierExecutor target = new HttpTaskCarrierExecutor();
 
             builderRequest.replace(bodyBuf);
+            builderRunnable.setExecutor(target);
 
             ObjectUtil.checkNotNull(builderBootstrap, "builderProvider is null");
             ObjectUtil.checkNotNull(builderProvider, "builderProvider is null");
@@ -117,45 +125,56 @@ public class HttpTaskCarrierExecutor {
             target.httpRequest = builderRequest;
             target.httpRequest.headers().add(builderHeaders);
             target.taskId = taskId;
-            target.listener = builderListener;
+            target.doneTodo = builderRunnable;
             return target;
         }
     }
 
-    public static class TaskExecuteResult {
+    private static class TaskExecuteResult {
         /*
         -1 connect unsuccessfully;
          0 read time out;
          ------ result is null
          1 success;
          */
-        private ResultType state;
-        private FullHttpResponse result;
+        private final ResultType state;
+        private final FullHttpResponse result;
         private Throwable cause;
 
-        public TaskExecuteResult(FullHttpResponse result) {
+        private TaskExecuteResult(FullHttpResponse result) {
             state = ResultType.SUCCESS;
+            result.retain();
             this.result = result;
         }
 
-        public TaskExecuteResult(ResultType type) {
+        private TaskExecuteResult(ResultType type) {
             state = type;
             result = null;
         }
 
         public Throwable getCause() { return cause; }
 
-        public void setCause(Throwable cause) { this.cause = cause; }
+        public FullHttpResponse getResult() { return result; }
+
+        private void setCause(Throwable cause) { this.cause = cause; }
 
         public boolean success() { return state.equals(ResultType.SUCCESS); }
 
-        public ResultType getState() { return state; }
+        private void release() {
+            if (result.refCnt() > 0)
+                result.release();
+        }
 
-        public void setState(ResultType state) { this.state = state; }
-
-        public FullHttpResponse getResult() { return result; }
-
-        public void setResult(FullHttpResponse result) { this.result = result; }
+        private String resultString() throws Throwable {
+            if (result == null)
+                return null;
+            if (!success())
+                throw getCause();
+            ByteBuf content = result.content();
+            byte[] array = content.array();
+            release();
+            return new String(array);
+        }
     }
 
     public void connectAndSend() {
@@ -174,26 +193,46 @@ public class HttpTaskCarrierExecutor {
              * send...
              */
             ChannelFuture send = sync.channel().writeAndFlush(httpRequest);
+            send.addListener((ChannelFutureListener) channelFuture -> HttpTaskExecutorPool.taskMap.put(taskId, this));
         } catch (Exception e) {
             result = new TaskExecuteResult(ResultType.RUNTIME_EXCEPTION);
             result.setCause(e);
         }
     }
 
-    public String syncGetAndTimeOutRemove() {
-        while (result == null) {
-            if (result != null) break;
-        }
-        if (!result.success())
-            return null;
-
-        ByteBuf content = this.result.getResult().content();
-        byte[] array = content.array();
-
-        return new String(array);
+    public boolean success() {
+        return result.success() && parseSuccess;
     }
 
-    public void setResult(TaskExecuteResult result) {
-        this.result = result;
+    public HttpResponseStatus getResultStatus() {
+        return result.getResult().status();
+    }
+
+    public String getResultString() {
+        String rs;
+        try {
+            rs = result.resultString();
+        } catch (Throwable throwable) {
+            rs = result.getCause().toString();
+        } finally {
+            HttpTaskExecutorPool.taskMap.remove(taskId);
+        }
+        return rs;
+    }
+
+    public void waitUtilDone() throws ExecutionException, InterruptedException {
+        do {
+            if (syncer != null) break;
+        } while (syncer == null);
+        syncer.get();
+    }
+
+    public void setResult(FullHttpResponse response) {
+        this.result = new TaskExecuteResult(response);
+    }
+
+    public void setResult(ResultType type, Throwable cause) {
+        this.result = new TaskExecuteResult(type);
+        this.result.setCause(cause);
     }
 }

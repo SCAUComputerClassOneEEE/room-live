@@ -14,53 +14,31 @@ import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Future;
 
 public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
 
     private RegistryClient app;
     private final AttributeKey<String> taskId = AttributeKey.valueOf("taskId");
+    private FullHttpResponse response;
 
     public HttpClientInBoundHandler(RegistryClient app) {
         this.app = app;
     }
 
-    /**
-     *
-     * 根据server返回的结果的内容进行处理
-     * 200 操作成功并完成所有流程
-     * 300
-     * 404
-     * 500
-     */
+    /*
+    * close channel 动作两端进行
+    * */
     @Override
     protected void channelRead0(ChannelHandlerContext ctx,
-                                FullHttpResponse fullHttpResponse/*逃不出这个方法，不需要retain*/) throws Exception {
-
+                                FullHttpResponse fullHttpResponse) throws Exception {
         final String taskIdHeader = fullHttpResponse.headers().get("taskId");
 
         if (StringUtil.isNullOrEmpty(taskIdHeader))
             throw new RuntimeException("taskId is null or empty");
+        response = fullHttpResponse;
 
-        final Attribute<String> attr = ctx.channel().attr(taskId);
-        final String taskIdUUID = attr.get();
-        final ConcurrentHashMap<String, HttpTaskCarrierExecutor> taskMap = HttpTaskExecutorPool.taskMap;
-        final HttpTaskCarrierExecutor executor = taskMap.get(taskIdUUID);
-
-        ObjectUtil.checkNotNull(executor, "map haven't this task" + taskId);
-        executor.setResult(new HttpTaskCarrierExecutor.TaskExecuteResult(fullHttpResponse));
-
-        /*任务完成，执行监听器的逻辑*/
-        ctx.channel().closeFuture().addListener(executor.getListener());
-
-        /*
-         * 池清理
-         * */
-        taskMap.remove(taskIdUUID);
-    }
-
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        super.userEventTriggered(ctx, evt);
+        ctx.channel().closeFuture().sync();
     }
 
     @Override
@@ -68,23 +46,35 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
         final Attribute<String> attr = ctx.channel().attr(taskId);
         final String taskIdUUID = attr.get();
         final HttpTaskCarrierExecutor executor = HttpTaskExecutorPool.taskMap.get(taskIdUUID);
-        ResultType error = ResultType.CONNECT_TIME_OUT;
+        ResultType error;
         if (cause instanceof ReadTimeoutException) {
             // read time out
             error = ResultType.READ_TIME_OUT;
         } else if (cause instanceof RuntimeException){
             // runtime
             error = ResultType.RUNTIME_EXCEPTION;
-        }else {
-            super.exceptionCaught(ctx, cause);
+        } else {
+            error = ResultType.UNKNOWN;
         }
-        HttpTaskCarrierExecutor.TaskExecuteResult taskExecuteResult = new HttpTaskCarrierExecutor.TaskExecuteResult(error);
-        taskExecuteResult.setCause(cause);
-        executor.setResult(taskExecuteResult);
+
+        executor.setResult(error, cause);
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        final Attribute<String> attr = ctx.channel().attr(taskId);
+        final String taskIdUUID = attr.get();
+        final HttpTaskExecutorPool pool = HttpTaskExecutorPool.getInstance();
+        final HttpTaskCarrierExecutor executor = HttpTaskExecutorPool.taskMap.get(taskIdUUID);
 
+        if (executor == null) {
+            throw new RuntimeException("map haven't this task: " + taskIdUUID);
+        }
+        executor.setResult(response);
+
+        /*任务完成，执行后续的逻辑*/
+        Future<?> submit = pool.submit(executor.getDoneTodo());
+        /*用于任务同步*/
+        executor.setSyncer(submit);
     }
 }

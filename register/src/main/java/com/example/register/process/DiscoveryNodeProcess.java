@@ -1,7 +1,10 @@
 package com.example.register.process;
 
 
+import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
+
+import java.util.List;
 
 /**
  *
@@ -24,7 +27,12 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public void register() {
+    public void register(ServiceProvider peerNode, ServiceProvider which, boolean sync) {
+
+    }
+
+    @Override
+    public void register(ServiceProvider peerNode, List<ServiceProvider> whichList, boolean sync) {
 
     }
 

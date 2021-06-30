@@ -10,6 +10,11 @@ import java.util.concurrent.*;
  */
 public class HttpTaskExecutorPool extends ThreadPoolExecutor {
 
+    /*
+    * when executor.connectAndSend -> put
+    * when executor.getResultString -> remove
+    * when channel inbound -> get
+    * */
     public static final ConcurrentHashMap<String/*taskId*/, HttpTaskCarrierExecutor> taskMap = new ConcurrentHashMap<>();
 
     private static final int DEFAULT_CORE_SIZE = 2;
@@ -27,10 +32,6 @@ public class HttpTaskExecutorPool extends ThreadPoolExecutor {
             }
         }
         return INSTANCE;
-    }
-
-    public void submit0(Runnable runnable) {
-        INSTANCE.submit(runnable);
     }
 
     private HttpTaskExecutorPool() {

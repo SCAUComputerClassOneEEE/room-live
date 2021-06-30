@@ -2,8 +2,6 @@ package com.example.register.serviceInfo;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  *
@@ -16,31 +14,35 @@ public class ServiceApplicationsTable {
     public static final String SERVER_PEER_NODE = "server-peer-node-service";
     public static final String DEFAULT_CLIENT_APPLICATION = "default_client-application";
 
-    private static final ConcurrentHashMap<String, ConcurrentSkipListSet<ServiceProvider>> doubleMarkMap = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> doubleMarkMap = new ConcurrentHashMap<>();
 
     public ServiceApplicationsTable(ServiceProvidersBootConfig config, /*初始化时候的服务列表*/
                                     String selfAppName/*自己的appName*/) {
         ServiceProvider selfNode = config.getSelfNode();
-        ConcurrentSkipListSet<ServiceProvider> selfSet = new ConcurrentSkipListSet<>(config.getTableSetRankComparator());
-        selfSet.add(selfNode);
+        ConcurrentHashMap<String,ServiceProvider> selfSet = new ConcurrentHashMap<>();
+        selfSet.put(selfNode.getMask(), selfNode);
         doubleMarkMap.put(selfAppName, selfSet);
 
-        ConcurrentSkipListSet<ServiceProvider> othersSet = new ConcurrentSkipListSet<>(config.getTableSetRankComparator());
-        List<ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
+        ConcurrentHashMap<String,ServiceProvider> othersSet = new ConcurrentHashMap<>();
+        Map<String, ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
         if (othersPeerServerNodes != null)
-            othersSet.addAll(othersPeerServerNodes);
+            othersSet.putAll(othersPeerServerNodes);
         doubleMarkMap.put(SERVER_PEER_NODE, othersSet);
     }
 
     public void remove(String appName) {
-
+        doubleMarkMap.remove(appName);
     }
 
     public void remove(ServiceProvider serviceProvider) {
-        ConcurrentSkipListSet<ServiceProvider> serviceProviders = doubleMarkMap.get(serviceProvider.getAppName());
+        Map<String, ServiceProvider> serviceProviders = doubleMarkMap.get(serviceProvider.getAppName());
     }
 
     public void put(String appName, String host, int port) {
+
+    }
+
+    public void put(String appName, ServiceProvider value) {
 
     }
 
@@ -50,7 +52,7 @@ public class ServiceApplicationsTable {
      * @return servers for notifying
      */
     public Iterator<ServiceProvider> getServers() {
-        return get(SERVER_PEER_NODE);
+        return getAsIterator(SERVER_PEER_NODE);
     }
 
     /**
@@ -59,23 +61,73 @@ public class ServiceApplicationsTable {
      * @param appName app name
      * @return app service
      */
-    public Iterator<ServiceProvider> get(String appName) {
-        ConcurrentSkipListSet<ServiceProvider> appSet = doubleMarkMap.get(appName);
-        if (appSet == null)
-            return null;
-        if (appSet.isEmpty()) return null;
-        return appSet.iterator();
+    public Iterator<ServiceProvider> getAsIterator(String appName) {
+        return getAsList(appName).iterator();
     }
 
-    public static ServiceProvider getOneByMask(Iterator<ServiceProvider> iterator, int mask) {
-        ServiceProvider s = null;
-        while (iterator.hasNext()) {
-            if (iterator.next().mask() == mask) {
-                s = iterator.next();
-                break;
-            }
-            iterator.remove();
+    public List<ServiceProvider> getAsList(String appName) {
+        final Map<String, ServiceProvider> appSet = doubleMarkMap.get(appName);
+        if (appSet == null) return null;
+        List<ServiceProvider> list = new LinkedList<>();
+        appSet.forEach((s, serviceProvider) -> list.add(serviceProvider));
+        return list;
+    }
+
+    public Enumeration<String> getAllAppNameEnum() {
+        return doubleMarkMap.keys();
+    }
+
+    public List<ServiceProvider> getAsClonedList(String appName) throws CloneNotSupportedException {
+        final List<ServiceProvider> asList = getAsList(appName);
+        List<ServiceProvider> rls = new LinkedList<>();
+
+        for (ServiceProvider r : asList) {
+            rls.add((ServiceProvider)r.clone());
         }
-        return s;
+        return rls;
+    }
+
+    public ServiceProvider get(String appName, String mask) {
+        ServiceProvider rSP;
+        if (appName == null || appName.equals("")) {
+            if (mask == null || mask.equals(""))
+                return null;
+            Collection<ConcurrentHashMap<String, ServiceProvider>> values = doubleMarkMap.values();
+
+            List<Map.Entry<String, ConcurrentHashMap<String, ServiceProvider>>> all = new LinkedList<>(doubleMarkMap.entrySet());
+            for (Map.Entry<String, ConcurrentHashMap<String, ServiceProvider>> e : all) {
+                ServiceProvider serviceProvider = e.getValue().get(mask);
+                if (serviceProvider != null)
+                    return serviceProvider;
+            }
+        }
+        if (mask == null || mask.equals(""))
+            return null;
+        Map<String, ServiceProvider> appSet = doubleMarkMap.get(appName);
+        rSP = appSet.get(mask);
+        return rSP;
+    }
+
+    /**
+     * 与自身的比较，并且返回返回版本更加高的
+     * @param second 全同步的来源
+     * @return 返回版本更加高的
+     */
+    public List<ServiceProvider> compareAndUpdate(List<ServiceProvider> second) {
+        try {
+            final ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> newTable = new ConcurrentHashMap<>();
+            Enumeration<String> allAppNameEnum = getAllAppNameEnum();
+            while (allAppNameEnum.hasMoreElements()) {
+                String s = allAppNameEnum.nextElement();
+                List<ServiceProvider> asClonedList = getAsClonedList(s);
+
+            }
+            synchronized (this) {
+                doubleMarkMap = newTable;
+            }
+        } catch (Exception e) {
+
+        }
+        return null;
     }
 }

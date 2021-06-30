@@ -4,6 +4,7 @@ import com.example.register.process.Application;
 import com.example.register.process.RegistryClient;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.ApplicationThread;
+import com.example.register.utils.HttpTaskExecutorPool;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;

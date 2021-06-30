@@ -25,7 +25,7 @@ public interface RegistryServer extends Application {
      *
      * 从 peer 拉取全部数据
      */
-    boolean syncAll(ServiceApplicationsTable table, ServiceProvider peerNode) throws Exception;
+    boolean syncAll(ServiceProvider peerNode, boolean sync) throws Exception;
 
     boolean isActive(ServiceProvider provider, boolean sync);
 

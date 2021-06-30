@@ -4,12 +4,13 @@ import com.example.register.process.RegistryServer;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 public class ServiceProvidersBootConfig {
     // myself
     private ServiceProvider selfNode;
     // others server
-    private List<ServiceProvider> othersPeerServerNodes;
+    private Map<String, ServiceProvider> othersPeerServerNodes;
 
     private RegistryServer.ClusterType serverClusterType;
 
@@ -104,11 +105,11 @@ public class ServiceProvidersBootConfig {
         this.selfNode = selfNode;
     }
 
-    public List<ServiceProvider> getOthersPeerServerNodes() {
+    public Map<String, ServiceProvider> getOthersPeerServerNodes() {
         return othersPeerServerNodes;
     }
 
-    public void setOthersPeerServerNodes(List<ServiceProvider> othersPeerServerNodes) {
+    public void setOthersPeerServerNodes(Map<String, ServiceProvider> othersPeerServerNodes) {
         serverClusterType = RegistryServer.ClusterType.P2P;
         this.othersPeerServerNodes = othersPeerServerNodes;
     }

@@ -1,7 +1,9 @@
 package com.example.register.process;
 
+import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -20,8 +22,9 @@ public interface RegistryClient extends Application {
      *
      * 向 server 注册
      */
-    void register();
+    void register(ServiceProvider peerNode, ServiceProvider which, boolean sync);
 
+    void register(ServiceProvider peerNode, List<ServiceProvider> whichList, boolean sync);
     /**
      *
      * 向 server 续约

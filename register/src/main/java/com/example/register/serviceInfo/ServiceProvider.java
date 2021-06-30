@@ -6,19 +6,21 @@ import com.google.common.util.concurrent.AtomicDouble;
 import java.io.Serializable;
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ServiceProvider implements Serializable {
+public class ServiceProvider implements Serializable, Cloneable {
 
     private String appName;
+    private String mask;
 
     private InstanceInfo info;
 
-    private final AtomicInteger connectingInt; // 正在连接数
+    private AtomicInteger connectingInt; // 正在连接数
 
-    private final AtomicInteger historyInt; // 历史连接数
+    private AtomicInteger historyInt; // 历史连接数
 
-    private final AtomicDouble avgAccess; // 平均响应时间
+    private AtomicDouble avgAccess; // 平均响应时间
 
     public ServiceProvider() {
         connectingInt = new AtomicInteger(0);
@@ -27,12 +29,15 @@ public class ServiceProvider implements Serializable {
     }
 
     public ServiceProvider(String appName, String host, int port) {
+        mask = UUID.randomUUID().toString();
         this.appName = appName;
         info = new InstanceInfo(host, port);
         connectingInt = new AtomicInteger(0);
         historyInt = new AtomicInteger(0);
         avgAccess = new AtomicDouble(0.0);
     }
+
+    public String getMask() { return mask; }
 
     public String getAppName() {
         return appName;
@@ -54,7 +59,6 @@ public class ServiceProvider implements Serializable {
      *
      * LB
      */
-
     public static class LeastConnectionComparator implements Comparator<ServiceProvider> {
         @Override
         public int compare(ServiceProvider o1, ServiceProvider o2) {
@@ -101,7 +105,7 @@ public class ServiceProvider implements Serializable {
         return Objects.hash(info);
     }
 
-    public int mask() {
+    /*public int mask() {
         String host = info.host();
         int port = info.port();
         return (host.hashCode() << 4) ^ portInterleaveHash(port);
@@ -113,6 +117,17 @@ public class ServiceProvider implements Serializable {
         int i2 = (port & 0x800) >> 9; // 1000 0000 0000 >> 9 = 1
         int i3 = (port & 0x8000) >> 12; // 1000 0000 0000 0000 >> 12 = 1
         return i | i1 | i2 | i3;
-    }
+    }*/
 
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        ServiceProvider cSP = (ServiceProvider)super.clone();
+        cSP.mask = mask;
+        cSP.appName = appName;
+        cSP.info = (InstanceInfo) super.clone();
+        cSP.avgAccess = new AtomicDouble(avgAccess.doubleValue());
+        cSP.connectingInt = new AtomicInteger(connectingInt.get());
+        cSP.historyInt = new AtomicInteger(historyInt.get());
+        return cSP;
+    }
 }
