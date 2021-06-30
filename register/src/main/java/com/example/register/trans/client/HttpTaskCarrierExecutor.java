@@ -36,11 +36,18 @@ public class HttpTaskCarrierExecutor {
 
     private String taskId;
 
+    /*
+    * 当这次http请求结束（收到inbound的response）之后的工作
+    * */
+    private ChannelFutureListener listener;
+
     private HttpTaskCarrierExecutor() {}
 
     public FullHttpRequest getHttpRequest() {
         return httpRequest;
     }
+
+    public ChannelFutureListener getListener() { return listener; }
 
     public static class Builder {
         private Bootstrap builderBootstrap;
@@ -48,6 +55,7 @@ public class HttpTaskCarrierExecutor {
         private FullHttpRequest builderRequest;
         private ByteBuf bodyBuf;
         private HttpHeaders builderHeaders;
+        private ChannelFutureListener builderListener;
         private String taskId;
 
         public static Builder builder() { return new Builder(); }
@@ -64,9 +72,12 @@ public class HttpTaskCarrierExecutor {
             return this;
         }
 
-        /**
-         *
-         *
+        public Builder doneListener(ChannelFutureListener listener) {
+            builderListener = listener;
+            return this;
+        }
+
+        /*
          * 不要在这里添加自动生成的taskId
          */
         public Builder addHeader(String h, Object o) {
@@ -106,55 +117,66 @@ public class HttpTaskCarrierExecutor {
             target.httpRequest = builderRequest;
             target.httpRequest.headers().add(builderHeaders);
             target.taskId = taskId;
+            target.listener = builderListener;
             return target;
         }
     }
 
     public static class TaskExecuteResult {
         /*
-        -1 connect time out;
+        -1 connect unsuccessfully;
          0 read time out;
          ------ result is null
          1 success;
          */
-        private int state;
+        private ResultType state;
         private FullHttpResponse result;
+        private Throwable cause;
 
         public TaskExecuteResult(FullHttpResponse result) {
-            state = 1;
+            state = ResultType.SUCCESS;
             this.result = result;
         }
 
-        public TaskExecuteResult(int s) {
-            state = s;
+        public TaskExecuteResult(ResultType type) {
+            state = type;
             result = null;
         }
 
-        public boolean success() { return state == 1; }
+        public Throwable getCause() { return cause; }
 
-        public int getState() { return state; }
+        public void setCause(Throwable cause) { this.cause = cause; }
 
-        public void setState(int state) { this.state = state; }
+        public boolean success() { return state.equals(ResultType.SUCCESS); }
+
+        public ResultType getState() { return state; }
+
+        public void setState(ResultType state) { this.state = state; }
 
         public FullHttpResponse getResult() { return result; }
 
         public void setResult(FullHttpResponse result) { this.result = result; }
     }
 
-    // send
     public void connectAndSend() {
         try {
-            ChannelFuture sync = bootstrap.connect(provider.getInfo().host(), provider.getInfo().port()).awaitUninterruptibly();
-            /*
-            connect time out
-             */
+            // connect
+            ChannelFuture sync = bootstrap.connect(provider.getInfo().host(), provider.getInfo().port()).await();
             if (!sync.isSuccess()) {
-                result = new TaskExecuteResult(-1);
+                /*
+                connect time out
+                */
+                result = new TaskExecuteResult(ResultType.CONNECT_TIME_OUT);
                 return;
             }
-            sync.channel().writeAndFlush(httpRequest);
+            /*
+             * connect successfully!
+             * send...
+             */
+            ChannelFuture send = sync.channel().writeAndFlush(httpRequest);
         } catch (Exception e) {
-            e.printStackTrace();
+            result = new TaskExecuteResult(ResultType.RUNTIME_EXCEPTION);
+            result.setCause(e);
         }
     }
 

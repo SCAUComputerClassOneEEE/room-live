@@ -58,16 +58,17 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
         final Bootstrap boots = (Bootstrap)bootstrap;
         final Integer connectTimeOut = config.getConnectTimeOut();
         final Integer readTimeOut = config.getReadTimeOut();
+        final int maxContentLength = config.getMaxContentLength();
         boots.group(clientNetWorkLoop)
                 .channel(NioSocketChannel.class)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeOut) // connect time out 3s
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeOut) // connect time out 3000ms
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline()
-                                .addLast(new ReadTimeoutHandler(readTimeOut, TimeUnit.MILLISECONDS)) // read time out 5s
+                                .addLast(new ReadTimeoutHandler(readTimeOut, TimeUnit.MILLISECONDS)) // read time out 5000ms
                                 .addLast(new HttpClientCodec())
-                                .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
+                                .addLast(new HttpObjectAggregator(maxContentLength))
                                 .addLast("task in handler", new HttpClientInBoundHandler(app))
                                 .addLast("task out handler", new HttpClientOutBoundHandler(app));
                     }
@@ -91,12 +92,14 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
         subQueue.clear();
     }
 
-    public boolean subTask(HttpTaskCarrierExecutor executor) throws Exception {
+    public void subTask(HttpTaskCarrierExecutor executor) throws Exception {
         if (!this.isAlive())
             throw new Exception("Client thread was interrupted.");
-        return mainQueue.add(executor);
+        do {
+            if (mainQueue.add(executor)) {
+                break;
+            }
+        } while (true);
+
     }
-
-
-
 }

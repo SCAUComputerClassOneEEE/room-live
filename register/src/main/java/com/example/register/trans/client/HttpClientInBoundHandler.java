@@ -7,6 +7,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.timeout.ReadTimeoutException;
+import io.netty.util.Attribute;
+import io.netty.util.AttributeKey;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
@@ -15,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
 
     private RegistryClient app;
+    private final AttributeKey<String> taskId = AttributeKey.valueOf("taskId");
 
     public HttpClientInBoundHandler(RegistryClient app) {
         this.app = app;
@@ -29,18 +33,29 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
      * 500
      */
     @Override
-    protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpResponse fullHttpResponse) throws Exception {
-        final ConcurrentHashMap<String, HttpTaskCarrierExecutor> taskMap = HttpTaskExecutorPool.taskMap;
-        String taskId = fullHttpResponse.headers().get("taskId");
+    protected void channelRead0(ChannelHandlerContext ctx,
+                                FullHttpResponse fullHttpResponse/*逃不出这个方法，不需要retain*/) throws Exception {
 
-        if (StringUtil.isNullOrEmpty(taskId))
+        final String taskIdHeader = fullHttpResponse.headers().get("taskId");
+
+        if (StringUtil.isNullOrEmpty(taskIdHeader))
             throw new RuntimeException("taskId is null or empty");
-        HttpTaskCarrierExecutor executor = taskMap.get(taskId);
+
+        final Attribute<String> attr = ctx.channel().attr(taskId);
+        final String taskIdUUID = attr.get();
+        final ConcurrentHashMap<String, HttpTaskCarrierExecutor> taskMap = HttpTaskExecutorPool.taskMap;
+        final HttpTaskCarrierExecutor executor = taskMap.get(taskIdUUID);
 
         ObjectUtil.checkNotNull(executor, "map haven't this task" + taskId);
         executor.setResult(new HttpTaskCarrierExecutor.TaskExecuteResult(fullHttpResponse));
 
-        taskMap.remove(taskId);
+        /*任务完成，执行监听器的逻辑*/
+        ctx.channel().closeFuture().addListener(executor.getListener());
+
+        /*
+         * 池清理
+         * */
+        taskMap.remove(taskIdUUID);
     }
 
     @Override
@@ -50,13 +65,26 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        final Attribute<String> attr = ctx.channel().attr(taskId);
+        final String taskIdUUID = attr.get();
+        final HttpTaskCarrierExecutor executor = HttpTaskExecutorPool.taskMap.get(taskIdUUID);
+        ResultType error = ResultType.CONNECT_TIME_OUT;
         if (cause instanceof ReadTimeoutException) {
             // read time out
-            HttpClientOutBoundHandler taskOutHandler = (HttpClientOutBoundHandler)ctx.pipeline().get("task out handler");
-            HttpTaskCarrierExecutor executor = HttpTaskExecutorPool.taskMap.get(taskOutHandler.getTaskId());
-            executor.setResult(new HttpTaskCarrierExecutor.TaskExecuteResult(0));
-        } else {
+            error = ResultType.READ_TIME_OUT;
+        } else if (cause instanceof RuntimeException){
+            // runtime
+            error = ResultType.RUNTIME_EXCEPTION;
+        }else {
             super.exceptionCaught(ctx, cause);
         }
+        HttpTaskCarrierExecutor.TaskExecuteResult taskExecuteResult = new HttpTaskCarrierExecutor.TaskExecuteResult(error);
+        taskExecuteResult.setCause(cause);
+        executor.setResult(taskExecuteResult);
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+
     }
 }

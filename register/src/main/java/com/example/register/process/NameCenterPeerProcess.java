@@ -171,6 +171,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
     public boolean syncAll(ServiceApplicationsTable table, ServiceProvider peerNode) throws Exception {
         boolean reB = true;
         String url = "/syncAll";
+        List<ServiceProvider> serviceProviders;
         String taskId = UUID.randomUUID().toString();
         HttpTaskCarrierExecutor httpTaskCarrierExecutor = HttpTaskCarrierExecutor.Builder.builder()
                 .byBootstrap((Bootstrap) client.getBootstrap())
@@ -179,12 +180,10 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
                 .addHeader("taskId", taskId)
                 .withBody("")
                 .create();
-        while (true) {
-            if (client.subTask(httpTaskCarrierExecutor)) {
-                HttpTaskExecutorPool.taskMap.put(taskId, httpTaskCarrierExecutor);
-                break;
-            }
-        }
+        /*block to sub taskQueue*/
+        client.subTask(httpTaskCarrierExecutor);
+        HttpTaskExecutorPool.taskMap.put(taskId, httpTaskCarrierExecutor);
+
         /*sync for List<ServiceProvider>*/
         String peerTables = httpTaskCarrierExecutor.syncGetAndTimeOutRemove();
         if (StringUtil.isNullOrEmpty(peerTables)) {
@@ -192,7 +191,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
         }
 
         try {
-            List<ServiceProvider> serviceProviders = JSONUtil.readListValue(peerTables, new TypeReference<List<ServiceProvider>>() {});
+            serviceProviders = JSONUtil.readListValue(peerTables, new TypeReference<List<ServiceProvider>>() {});
 
         } catch (IOException ioException) {
             reB = false;

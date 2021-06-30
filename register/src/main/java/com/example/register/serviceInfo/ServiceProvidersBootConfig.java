@@ -13,18 +13,36 @@ public class ServiceProvidersBootConfig {
 
     private RegistryServer.ClusterType serverClusterType;
 
+    /*
+    * client
+    * */
     private int taskQueueMaxSize;
     private int nextSize;
     private int clientSubExecutors;
-    private int connectTimeOut;
-    private int readTimeOut;
-    private int writeTimeOut;
+    private int connectTimeOut; // mills
+    private int readTimeOut; // mills
+
+    /*
+    * server
+    * */
+    private int writeTimeOut; // mills
+    private int serverPort;
+    private int maxContentLength;
+    private int backLog;
 
     private Comparator<ServiceProvider> tableSetRankComparator;
+
+    public int getBackLog() { return backLog; }
+
+    public void setBackLog(int backLog) { this.backLog = backLog; }
 
     public int getTaskQueueMaxSize() {
         return taskQueueMaxSize;
     }
+
+    public int getMaxContentLength() { return maxContentLength; }
+
+    public void setMaxContentLength(int maxContentLength) { this.maxContentLength = maxContentLength; }
 
     public void setTaskQueueMaxSize(int taskQueueMaxSize) {
         this.taskQueueMaxSize = taskQueueMaxSize;
@@ -44,6 +62,14 @@ public class ServiceProvidersBootConfig {
 
     public void setTableSetRankComparator(Comparator<ServiceProvider> tableSetRankComparator) {
         this.tableSetRankComparator = tableSetRankComparator;
+    }
+
+    public int getServerPort() {
+        return serverPort;
+    }
+
+    public void setServerPort(int serverPort) {
+        this.serverPort = serverPort;
     }
 
     public int getConnectTimeOut() {

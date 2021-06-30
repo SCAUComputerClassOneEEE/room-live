@@ -24,6 +24,8 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
     private RegistryServer app;
     private final EventLoopGroup boosGroup = new NioEventLoopGroup(1);
     private final EventLoopGroup workerGroup = new NioEventLoopGroup(1);
+    private int port;
+    private ChannelFuture bind;
 
     private static final Runnable runnable = () -> {
 
@@ -42,17 +44,21 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
         }
         bootstrap = new ServerBootstrap();
         final Integer writeTimeOut = config.getWriteTimeOut();
-        ((ServerBootstrap)bootstrap)
+        final int maxContentLength = config.getMaxContentLength();
+        final int backLog = config.getBackLog();
+        port = config.getServerPort();
+        ((ServerBootstrap) bootstrap)
                 .group(boosGroup, workerGroup)
+                .localAddress(port)
                 .channel(NioServerSocketChannel.class)
-                .option(ChannelOption.SO_BACKLOG,1024)
+                .option(ChannelOption.SO_BACKLOG, backLog)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline()
                                 .addLast(new WriteTimeoutHandler(writeTimeOut, TimeUnit.MILLISECONDS))
                                 .addLast(new HttpServerCodec())
-                                .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
+                                .addLast(new HttpObjectAggregator(maxContentLength))
                                 .addLast(new HttpServerHandler(app));
                     }
                 });

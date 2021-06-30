@@ -37,6 +37,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             case "POST" : postMethod(cxt, request); break;
             default: response(cxt, "error http method!");
         }
+        cxt.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK))
+                .addListener(ChannelFutureListener.CLOSE);
     }
 
     private void getMethod(ChannelHandlerContext cxt, FullHttpRequest request) {
