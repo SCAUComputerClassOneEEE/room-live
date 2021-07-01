@@ -1,23 +1,16 @@
 package com.example.register.trans.client;
 
-import com.example.register.serviceInfo.InstanceInfo;
-import com.example.register.serviceInfo.ServiceApplicationsTable;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.utils.HttpTaskExecutorPool;
-import com.example.register.utils.JSONUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.*;
 import io.netty.util.internal.ObjectUtil;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -29,19 +22,12 @@ import java.util.concurrent.Future;
  **/
 public class HttpTaskCarrierExecutor {
     private Bootstrap bootstrap; // how
-
     private ServiceProvider provider; // where
-
     private FullHttpRequest httpRequest; // for what
-
     private volatile TaskExecuteResult result;
-
     private boolean parseSuccess;
-
     private String taskId;
-
-    private HttpTaskDoneRunnable doneTodo;
-
+    private ProcessedRunnable<HttpTaskCarrierExecutor> doneTodo;
     private volatile Future<?> syncer;
 
     private HttpTaskCarrierExecutor() {}
@@ -50,7 +36,7 @@ public class HttpTaskCarrierExecutor {
 
     public void setParseSuccess(boolean parseSuccess) { this.parseSuccess = parseSuccess; }
 
-    public Runnable getDoneTodo() { return doneTodo; }
+    private Runnable getDoneTodo() { return doneTodo; }
 
     public static class Builder {
         private Bootstrap builderBootstrap;
@@ -58,7 +44,7 @@ public class HttpTaskCarrierExecutor {
         private FullHttpRequest builderRequest;
         private ByteBuf bodyBuf;
         private HttpHeaders builderHeaders;
-        private HttpTaskDoneRunnable builderRunnable;
+        private ProcessedRunnable<HttpTaskCarrierExecutor> builderRunnable;
         private String taskId;
 
         public static Builder builder() { return new Builder(); }
@@ -75,7 +61,7 @@ public class HttpTaskCarrierExecutor {
             return this;
         }
 
-        public Builder done(HttpTaskDoneRunnable runnable) {
+        public Builder done(ProcessedRunnable<HttpTaskCarrierExecutor> runnable) {
             builderRunnable = runnable;
             return this;
         }
@@ -127,12 +113,6 @@ public class HttpTaskCarrierExecutor {
     }
 
     private static class TaskExecuteResult {
-        /*
-        -1 connect unsuccessfully;
-         0 read time out;
-         ------ result is null
-         1 success;
-         */
         final ResultType state;
         final FullHttpResponse result;
         Throwable cause;
@@ -173,17 +153,40 @@ public class HttpTaskCarrierExecutor {
         }
     }
 
+
+    /*
+    *                               ...
+    *                               /|\
+    *                                |   false
+    * builder --> create --> subTask --> (sync?)              doneRunnable to do -->
+    *                                |   true to wait                    /|\
+    *                                |                                    |
+    *                               sync                                  |
+    *                                |                                    |
+    *                               \|/                                   |
+    *                          connectAndSend --> CONNECT_TIME_OUT  --> syncFail
+    *                                |       |--> RUNTIME_EXCEPTION --> syncFail
+    *                               \|/                                   |
+    *                         request out bound                           |
+    *                                |                                    |
+    *                               \|/                                   |
+    *                       response in bound --> READ_TIME_OUT     --> syncFail
+    *                                |       |--> RUNTIME_EXCEPTION --> syncFail
+    *                                |       |--> UNKNOWN           --> syncFail
+    *                               \|/                                   |
+    *                        channel inactive --> SUCCESS           --> syncSuccess
+    * */
     public void syncSuccess(FullHttpResponse result) {
         setResult(result);
-        sync();
+        syncResult();
     }
 
     public void syncFail(ResultType type, Throwable cause) {
         setResult(type, cause);
-        sync();
+        syncResult();
     }
 
-    private void sync() {
+    private void syncResult() {
         HttpTaskExecutorPool pool = HttpTaskExecutorPool.getInstance();
         synchronized (this) {
             /*
@@ -237,7 +240,7 @@ public class HttpTaskCarrierExecutor {
         return rs;
     }
 
-    public void waitUtilDone() throws ExecutionException, InterruptedException {
+    public void sync() throws ExecutionException, InterruptedException {
         synchronized (this) {
             if (syncer == null)
                 this.wait();

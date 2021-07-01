@@ -43,9 +43,7 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        final Attribute<String> attr = ctx.channel().attr(taskId);
-        final String taskIdUUID = attr.get();
-        final HttpTaskCarrierExecutor executor = HttpTaskExecutorPool.taskMap.get(taskIdUUID);
+        final HttpTaskCarrierExecutor executor = getExecutor(ctx);
         ResultType error;
         if (cause instanceof ReadTimeoutException) {
             // read time out
@@ -60,14 +58,22 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
         executor.syncFail(error, cause);
     }
 
+    private HttpTaskCarrierExecutor getExecutor(ChannelHandlerContext ctx) {
+        String taskIdUUID = getTaskId(ctx);
+        return HttpTaskExecutorPool.taskMap.get(taskIdUUID);
+    }
+
+    private String getTaskId(ChannelHandlerContext ctx) {
+        Attribute<String> attr = ctx.channel().attr(taskId);
+        return attr.get();
+    }
+
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        final Attribute<String> attr = ctx.channel().attr(taskId);
-        final String taskIdUUID = attr.get();
-        final HttpTaskCarrierExecutor executor = HttpTaskExecutorPool.taskMap.get(taskIdUUID);
+        final HttpTaskCarrierExecutor executor = getExecutor(ctx);
 
         if (executor == null) {
-            throw new RuntimeException("map haven't this task: " + taskIdUUID);
+            throw new RuntimeException("map haven't this task: " + getTaskId(ctx));
         }
 
         executor.syncSuccess(response);

@@ -1,25 +1,16 @@
 package com.example.register.process;
 
 
-import com.example.register.serviceInfo.InstanceInfo;
-import com.example.register.serviceInfo.ServiceApplicationsTable;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
-import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
-import com.example.register.trans.client.HttpTaskDoneRunnable;
+import com.example.register.trans.client.ProcessedRunnable;
 import com.example.register.trans.server.ApplicationServer;
-import com.example.register.utils.HttpTaskExecutorPool;
 import com.example.register.utils.JSONUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
-import io.netty.util.internal.StringUtil;
 
-import java.io.IOException;
 import java.util.*;
 
 /**
@@ -110,9 +101,9 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
                 .access(HttpMethod.GET, "/syncAll")
                 .connectWith(peerNode)
                 .addHeader("taskId", UUID.randomUUID().toString())
-                .done(new HttpTaskDoneRunnable() {
+                .done(new ProcessedRunnable<HttpTaskCarrierExecutor>() {
                     @Override
-                    public void doneRun(HttpTaskCarrierExecutor executor) {
+                    public void processed(HttpTaskCarrierExecutor executor) {
                         if (executor.success()) {
                             String peerTables = executor.getResultString();
                             try {
@@ -132,7 +123,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
         /*block to sub taskQueue*/
         client.subTask(executor);
         if (sync)
-            executor.waitUtilDone();
+            executor.sync();
         else return false;
         return executor.success() & executor.isParseSuccess();
     }
