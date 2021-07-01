@@ -24,25 +24,28 @@ public interface RegistryClient extends Application {
     /**
      *
      * 向 server 注册
+     * POST /register
      */
     void register(ServiceProvider peerNode, ServiceProvider which, boolean sync);
 
-    void register(ServiceProvider peerNode, Map<String, Set<ServiceProvider>> whichList, boolean sync);
     /**
      *
      * 向 server 续约更新，版本迭代
+     * PUT /renew
      */
     void renew(ServiceProvider provider/*just myself*/, boolean sync);
 
     /**
      *
-     * 向 server 拉取某个 provider
+     * 向 server 拉取某个 app
+     * GET /discover
      */
     void discover();
 
     /**
      *
      * 暂停服务
+     *
      */
     void pause();
 

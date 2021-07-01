@@ -28,12 +28,10 @@ import java.util.*;
  *
  * 开启两个线程，serverThread 和 clientThread
  */
-public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
+public class NameCenterPeerProcess extends DiscoveryNodeProcess implements RegistryServer {
 
     private static final NameCenterPeerProcess INSTANCE = new NameCenterPeerProcess();
-    private static ServiceApplicationsTable table;
 
-    private ApplicationClient client;
     private ApplicationServer server;
 
     // 基础通信：client 和 server
@@ -63,24 +61,7 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
      */
     @Override
     public void init(ServiceProvidersBootConfig config) throws Exception {
-        /*
-        * lockForStatus...
-        * */
-        if (!lockForStatus())
-            return;
-        // initialize the table with config and myself
-        table = new ServiceApplicationsTable(
-                config,
-                ServiceApplicationsTable.SERVER_PEER_NODE);
-
-        client = new ApplicationClient(config.getTaskQueueMaxSize(), config.getNextSize());
-        server = new ApplicationServer();
-        // initialize the client and server's thread worker for working.
-        client.init(this, config);
-        server.init(this, config);
-
-        client.start();
-
+        super.init(config);
         if (config.getServerClusterType().equals(ClusterType.P2P)) {
             Iterator<ServiceProvider> servers = table.getServers();
             while (servers.hasNext()) {
@@ -88,11 +69,12 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
                 servers.remove();
             }
         }
-
         /*
         *
         * start server
         * */
+        server = new ApplicationServer();
+        server.init(this, config);
     }
 
     /**
@@ -115,41 +97,6 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
 
     }
 
-
-    /**
-     *
-     * 该服务peer注册集群中到其他的peer中
-     */
-    @Override
-    public void register(ServiceProvider peerNode, ServiceProvider which, boolean sync) {
-
-    }
-
-    @Override
-    public void register(ServiceProvider peerNode, Map<String, Set<ServiceProvider>> whichList, boolean sync) {
-
-    }
-
-    @Override
-    public void renew(ServiceProvider provider, boolean sync) {
-
-    }
-
-    @Override
-    public void discover() {
-
-    }
-
-    @Override
-    public void pause() {
-
-    }
-
-    @Override
-    public void offline() {
-
-    }
-
     @Override
     public void replicate() {
         String url = "replicate";
@@ -158,12 +105,6 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
 
     @Override
     public boolean syncAll(ServiceProvider peerNode, boolean sync) throws Exception {
-        if (!isActive(peerNode, true)) {
-            /*
-             * peers all is active?
-             */
-            return false;
-        }
         HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                 .byBootstrap((Bootstrap) client.getBootstrap())
                 .access(HttpMethod.GET, "/syncAll")
@@ -179,8 +120,9 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
                                         new TypeReference<Map<String, Set<ServiceProvider>>>() {});
 
                                 Map<String, Set<ServiceProvider>> selfHigherList = table.compareAndReturnUpdate(serviceProviders);
-                                if (!selfHigherList.isEmpty())
-                                    register(peerNode, selfHigherList, false);
+                                if (!selfHigherList.isEmpty()) {
+                                    // replicate
+                                }
                             } catch (Exception e) {
                                 executor.setParseSuccess(false);
                             }

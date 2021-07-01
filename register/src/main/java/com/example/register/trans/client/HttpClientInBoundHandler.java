@@ -57,24 +57,19 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
             error = ResultType.UNKNOWN;
         }
 
-        executor.setResult(error, cause);
+        executor.syncFail(error, cause);
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         final Attribute<String> attr = ctx.channel().attr(taskId);
         final String taskIdUUID = attr.get();
-        final HttpTaskExecutorPool pool = HttpTaskExecutorPool.getInstance();
         final HttpTaskCarrierExecutor executor = HttpTaskExecutorPool.taskMap.get(taskIdUUID);
 
         if (executor == null) {
             throw new RuntimeException("map haven't this task: " + taskIdUUID);
         }
-        executor.setResult(response);
 
-        /*任务完成，执行后续的逻辑*/
-        Future<?> submit = pool.submit(executor.getDoneTodo());
-        /*用于任务同步*/
-        executor.setSyncer(submit);
+        executor.syncSuccess(response);
     }
 }

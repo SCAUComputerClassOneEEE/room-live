@@ -46,10 +46,6 @@ public class HttpTaskCarrierExecutor {
 
     private HttpTaskCarrierExecutor() {}
 
-    public void setSyncer(Future<?> syncer) {
-        this.syncer = syncer;
-    }
-
     public boolean isParseSuccess() { return parseSuccess; }
 
     public void setParseSuccess(boolean parseSuccess) { this.parseSuccess = parseSuccess; }
@@ -137,35 +133,35 @@ public class HttpTaskCarrierExecutor {
          ------ result is null
          1 success;
          */
-        private final ResultType state;
-        private final FullHttpResponse result;
-        private Throwable cause;
+        final ResultType state;
+        final FullHttpResponse result;
+        Throwable cause;
 
-        private TaskExecuteResult(FullHttpResponse result) {
+        TaskExecuteResult(FullHttpResponse result) {
             state = ResultType.SUCCESS;
             result.retain();
             this.result = result;
         }
 
-        private TaskExecuteResult(ResultType type) {
+        TaskExecuteResult(ResultType type) {
             state = type;
             result = null;
         }
 
-        public Throwable getCause() { return cause; }
+        Throwable getCause() { return cause; }
 
-        public FullHttpResponse getResult() { return result; }
+        FullHttpResponse getResult() { return result; }
 
-        private void setCause(Throwable cause) { this.cause = cause; }
+        void setCause(Throwable cause) { this.cause = cause; }
 
-        public boolean success() { return state.equals(ResultType.SUCCESS); }
+        boolean success() { return state.equals(ResultType.SUCCESS); }
 
-        private void release() {
+        void release() {
             if (result.refCnt() > 0)
                 result.release();
         }
 
-        private String resultString() throws Throwable {
+        String resultString() throws Throwable {
             if (result == null)
                 return null;
             if (!success())
@@ -177,6 +173,28 @@ public class HttpTaskCarrierExecutor {
         }
     }
 
+    public void syncSuccess(FullHttpResponse result) {
+        setResult(result);
+        sync();
+    }
+
+    public void syncFail(ResultType type, Throwable cause) {
+        setResult(type, cause);
+        sync();
+    }
+
+    private void sync() {
+        HttpTaskExecutorPool pool = HttpTaskExecutorPool.getInstance();
+        synchronized (this) {
+            /*
+            * maybe none wait for this
+            * so it need the pool to background exec
+            * */
+            this.syncer = pool.submit(this::getDoneTodo);
+            this.notify();
+        }
+    }
+
     public void connectAndSend() {
         try {
             // connect
@@ -185,7 +203,7 @@ public class HttpTaskCarrierExecutor {
                 /*
                 connect time out
                 */
-                result = new TaskExecuteResult(ResultType.CONNECT_TIME_OUT);
+                syncFail(ResultType.CONNECT_TIME_OUT, new Exception("connect time out with" + provider.getInfo()));
                 return;
             }
             /*
@@ -195,8 +213,7 @@ public class HttpTaskCarrierExecutor {
             ChannelFuture send = sync.channel().writeAndFlush(httpRequest);
             send.addListener((ChannelFutureListener) channelFuture -> HttpTaskExecutorPool.taskMap.put(taskId, this));
         } catch (Exception e) {
-            result = new TaskExecuteResult(ResultType.RUNTIME_EXCEPTION);
-            result.setCause(e);
+            syncFail(ResultType.RUNTIME_EXCEPTION, e);
         }
     }
 
@@ -221,17 +238,18 @@ public class HttpTaskCarrierExecutor {
     }
 
     public void waitUtilDone() throws ExecutionException, InterruptedException {
-        do {
-            if (syncer != null) break;
-        } while (syncer == null);
-        syncer.get();
+        synchronized (this) {
+            if (syncer == null)
+                this.wait();
+            syncer.get();
+        }
     }
 
-    public void setResult(FullHttpResponse response) {
+    private void setResult(FullHttpResponse response) {
         this.result = new TaskExecuteResult(response);
     }
 
-    public void setResult(ResultType type, Throwable cause) {
+    private void setResult(ResultType type, Throwable cause) {
         this.result = new TaskExecuteResult(type);
         this.result.setCause(cause);
     }
