@@ -9,6 +9,8 @@ import io.netty.util.internal.StringUtil;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class JSONUtil {
     private static final ObjectMapper mapper = new ObjectMapper();
@@ -28,7 +30,7 @@ public class JSONUtil {
         return mapper.writeValueAsString(o);
     }
 
-    public static <T> List<T> readListValue(String str, TypeReference<List<T>> typeReference) throws IOException {
+    public static <K, T> Map<K, Set<T>> readMapSetValue(String str, TypeReference<Map<K, Set<T>>> typeReference) throws IOException {
         return mapper.readValue(str, typeReference);
     }
 }

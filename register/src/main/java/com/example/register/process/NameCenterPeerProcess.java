@@ -20,9 +20,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.util.internal.StringUtil;
 
 import java.io.IOException;
-import java.util.Iterator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 /**
  *
@@ -128,12 +126,12 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
     }
 
     @Override
-    public void register(ServiceProvider peerNode, List<ServiceProvider> whichList, boolean sync) {
+    public void register(ServiceProvider peerNode, Map<String, Set<ServiceProvider>> whichList, boolean sync) {
 
     }
 
     @Override
-    public void renew() {
+    public void renew(ServiceProvider provider, boolean sync) {
 
     }
 
@@ -177,10 +175,10 @@ public class NameCenterPeerProcess implements RegistryServer, RegistryClient {
                         if (executor.success()) {
                             String peerTables = executor.getResultString();
                             try {
-                                List<ServiceProvider> serviceProviders = JSONUtil.readListValue(peerTables,
-                                        new TypeReference<List<ServiceProvider>>() {});
+                                Map<String, Set<ServiceProvider>> serviceProviders = JSONUtil.readMapSetValue(peerTables,
+                                        new TypeReference<Map<String, Set<ServiceProvider>>>() {});
 
-                                List<ServiceProvider> selfHigherList = table.compareAndUpdate(serviceProviders);
+                                Map<String, Set<ServiceProvider>> selfHigherList = table.compareAndReturnUpdate(serviceProviders);
                                 if (!selfHigherList.isEmpty())
                                     register(peerNode, selfHigherList, false);
                             } catch (Exception e) {

@@ -3,7 +3,10 @@ package com.example.register.process;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -24,12 +27,12 @@ public interface RegistryClient extends Application {
      */
     void register(ServiceProvider peerNode, ServiceProvider which, boolean sync);
 
-    void register(ServiceProvider peerNode, List<ServiceProvider> whichList, boolean sync);
+    void register(ServiceProvider peerNode, Map<String, Set<ServiceProvider>> whichList, boolean sync);
     /**
      *
-     * 向 server 续约
+     * 向 server 续约更新，版本迭代
      */
-    void renew();
+    void renew(ServiceProvider provider/*just myself*/, boolean sync);
 
     /**
      *

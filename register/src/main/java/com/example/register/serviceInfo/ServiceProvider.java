@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ServiceProvider implements Serializable, Cloneable {
+public class ServiceProvider implements Serializable, Cloneable, Comparable<ServiceProvider>, Coverable<ServiceProvider> {
 
     private String appName;
     private String mask;
@@ -17,16 +17,10 @@ public class ServiceProvider implements Serializable, Cloneable {
     private InstanceInfo info;
 
     private AtomicInteger connectingInt; // 正在连接数
-
     private AtomicInteger historyInt; // 历史连接数
-
     private AtomicDouble avgAccess; // 平均响应时间
 
-    public ServiceProvider() {
-        connectingInt = new AtomicInteger(0);
-        historyInt = new AtomicInteger(0);
-        avgAccess = new AtomicDouble(0.0);
-    }
+    public ServiceProvider() { }
 
     public ServiceProvider(String appName, String host, int port) {
         mask = UUID.randomUUID().toString();
@@ -43,16 +37,33 @@ public class ServiceProvider implements Serializable, Cloneable {
         return appName;
     }
 
-    public void setAppName(String appName) {
-        this.appName = appName;
-    }
-
     public InstanceInfo getInfo() {
         return info;
     }
 
-    public void setInfo(InstanceInfo info) {
-        this.info = info;
+    /**
+     * 只在renew的函数中发生
+     * */
+    public void newVersion() {
+        this.info = new InstanceInfo(info.host(), info.port());
+    }
+
+    /*版本比较器*/
+    @Override
+    public int compareTo(ServiceProvider o) {
+        return this.info.compareTo(o.info);
+    }
+
+    @Override
+    public boolean cover(ServiceProvider s) {
+        if (s == null) return false;
+        if (!mask.equals(s.mask)) return false;
+        if (!appName.equals(s.appName)) return false;
+        if (!info.cover(s.info)) return false;
+        connectingInt.set(s.connectingInt.get());
+        historyInt.set(s.historyInt.get());
+        avgAccess.set(s.avgAccess.doubleValue());
+        return true;
     }
 
     /*
@@ -97,7 +108,7 @@ public class ServiceProvider implements Serializable, Cloneable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ServiceProvider that = (ServiceProvider) o;
-        return info.equals(that.info);
+        return mask.equals(that.mask);
     }
 
     @Override

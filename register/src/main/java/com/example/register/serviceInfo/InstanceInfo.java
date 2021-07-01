@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 2. 版本号
  * 3. 。。。
  */
-public class InstanceInfo implements Comparable<InstanceInfo>, Cloneable{
+public class InstanceInfo implements Comparable<InstanceInfo>, Cloneable, Coverable<InstanceInfo> {
 
     private ConcatAddress instAdr;
     private Timestamp version;
@@ -72,7 +72,15 @@ public class InstanceInfo implements Comparable<InstanceInfo>, Cloneable{
         return cIf;
     }
 
-    public static class ConcatAddress implements Cloneable{
+    @Override
+    public boolean cover(InstanceInfo instanceInfo) {
+        if (instanceInfo.version.before(version)) return false;
+        if (!instAdr.cover(instanceInfo.instAdr)) return false;
+        version = new Timestamp(instanceInfo.version.getTime());
+        return true;
+    }
+
+    public static class ConcatAddress implements Cloneable, Coverable<ConcatAddress> {
         public String ip;
         public int port;
 
@@ -119,6 +127,14 @@ public class InstanceInfo implements Comparable<InstanceInfo>, Cloneable{
         @Override
         public int hashCode() {
             return Objects.hash(ip, port);
+        }
+
+        @Override
+        public boolean cover(ConcatAddress concatAddress) {
+            if (concatAddress == null) return false;
+            ip = concatAddress.ip;
+            port = concatAddress.port;
+            return true;
         }
     }
 }

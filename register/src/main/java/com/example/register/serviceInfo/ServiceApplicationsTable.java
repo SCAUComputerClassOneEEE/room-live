@@ -1,7 +1,11 @@
 package com.example.register.serviceInfo;
 
+import com.example.register.utils.CollectionUtil;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
+import java.util.stream.Stream;
 
 /**
  *
@@ -14,10 +18,15 @@ public class ServiceApplicationsTable {
     public static final String SERVER_PEER_NODE = "server-peer-node-service";
     public static final String DEFAULT_CLIENT_APPLICATION = "default_client-application";
 
-    private ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> doubleMarkMap = new ConcurrentHashMap<>();
+    private volatile ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> doubleMarkMap;
+
+    public ServiceApplicationsTable() {
+
+    }
 
     public ServiceApplicationsTable(ServiceProvidersBootConfig config, /*初始化时候的服务列表*/
                                     String selfAppName/*自己的appName*/) {
+        doubleMarkMap = new ConcurrentHashMap<>();
         ServiceProvider selfNode = config.getSelfNode();
         ConcurrentHashMap<String,ServiceProvider> selfSet = new ConcurrentHashMap<>();
         selfSet.put(selfNode.getMask(), selfNode);
@@ -47,8 +56,20 @@ public class ServiceApplicationsTable {
     }
 
     /**
-     *
-     *
+     * for json or compareAndUpdate
+     * */
+    public Map<String/*appName*/, Set<ServiceProvider>/*instances*/> getAllAsMapSet() {
+        long ml = doubleMarkMap.mappingCount(); Enumeration<String> apps = doubleMarkMap.keys();
+        Map<String, Set<ServiceProvider>> getMapList = new HashMap<>();
+        while (apps.hasMoreElements() && ml -- > 0) {
+            String s = apps.nextElement();
+            Set<ServiceProvider> asList = getAsSet(s);
+            getMapList.put(s, asList);
+        }
+        return getMapList;
+    }
+
+    /**
      * @return servers for notifying
      */
     public Iterator<ServiceProvider> getServers() {
@@ -56,30 +77,25 @@ public class ServiceApplicationsTable {
     }
 
     /**
-     *
-     *
      * @param appName app name
      * @return app service
      */
     public Iterator<ServiceProvider> getAsIterator(String appName) {
-        return getAsList(appName).iterator();
+        return getAsSet(appName).iterator();
     }
 
-    public List<ServiceProvider> getAsList(String appName) {
+    public Set<ServiceProvider> getAsSet(String appName) {
         final Map<String, ServiceProvider> appSet = doubleMarkMap.get(appName);
-        if (appSet == null) return null;
-        List<ServiceProvider> list = new LinkedList<>();
+        Set<ServiceProvider> list = new HashSet<>();
+        if (appSet == null) return list;
         appSet.forEach((s, serviceProvider) -> list.add(serviceProvider));
         return list;
     }
 
-    public Enumeration<String> getAllAppNameEnum() {
-        return doubleMarkMap.keys();
-    }
 
-    public List<ServiceProvider> getAsClonedList(String appName) throws CloneNotSupportedException {
-        final List<ServiceProvider> asList = getAsList(appName);
-        List<ServiceProvider> rls = new LinkedList<>();
+    public Set<ServiceProvider> getAsClonedSet(String appName) throws CloneNotSupportedException {
+        final Set<ServiceProvider> asList = getAsSet(appName);
+        Set<ServiceProvider> rls = new HashSet<>();
 
         for (ServiceProvider r : asList) {
             rls.add((ServiceProvider)r.clone());
@@ -109,25 +125,59 @@ public class ServiceApplicationsTable {
     }
 
     /**
-     * 与自身的比较，并且返回返回版本更加高的
+     * 与自身的比较并更新，并且返回返回版本更加高的，自身有而second没有的
      * @param second 全同步的来源
      * @return 返回版本更加高的
      */
-    public List<ServiceProvider> compareAndUpdate(List<ServiceProvider> second) {
-        try {
-            final ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> newTable = new ConcurrentHashMap<>();
-            Enumeration<String> allAppNameEnum = getAllAppNameEnum();
-            while (allAppNameEnum.hasMoreElements()) {
-                String s = allAppNameEnum.nextElement();
-                List<ServiceProvider> asClonedList = getAsClonedList(s);
+    public Map<String, Set<ServiceProvider>> compareAndReturnUpdate(Map<String, Set<ServiceProvider>> second) {
+        Map<String, Set<ServiceProvider>> updateMap = new HashMap<>();
 
+        Map<String, Set<ServiceProvider>> first = getAllAsMapSet();
+        second.forEach((s, sSet) -> {
+            Set<ServiceProvider> fSet = first.get(s);
+            Set<ServiceProvider> uSet = compareAndReturnUpdate(fSet, sSet);
+            if (!uSet.isEmpty()) {
+                updateMap.put(s, uSet);
             }
-            synchronized (this) {
-                doubleMarkMap = newTable;
-            }
-        } catch (Exception e) {
+        });
+        return updateMap;
+    }
 
+    private Set<ServiceProvider> compareAndReturnUpdate(Set<ServiceProvider> first/*self*/, Set<ServiceProvider> second) {
+        Collection<ServiceProvider> same = new HashSet<>();
+        CollectionUtil.saveUniqueAndDuplicates(
+                first/*first有second没有的，返回*/,
+                second/*first没有second有的，自身更新*/,
+                same/*都有的，比较版本，旧的返回，新的自身更新*/ /*same的来源是，长度最大的set*/
+        );
+        // return set
+        Set<ServiceProvider> updateSet = new HashSet<>(first);
+        // update self
+        for (ServiceProvider newOne : second) {
+            ConcurrentHashMap<String, ServiceProvider> subMap = doubleMarkMap.get(newOne.getAppName());
+            subMap.put(newOne.getMask(), newOne);
         }
-        return null;
+        Set<ServiceProvider> sameFromSecond;
+        if (first.size() >= second.size()) {
+            // same set belong to first set
+            sameFromSecond = new HashSet<>();
+            for (ServiceProvider sameSourceOne : second) {
+                if (same.contains(sameSourceOne)) sameFromSecond.add(sameSourceOne);
+            }
+        } else {
+            // same set belong to second set
+            sameFromSecond = new HashSet<>(same);
+        }
+        // update(try to cover) with same set
+        for (ServiceProvider secondS : sameFromSecond) {
+            boolean cover = doubleMarkMap.get(secondS.getAppName()).get(secondS.getMask()).cover(secondS);
+            if (!cover) {
+                // old version
+                updateSet.add(secondS);
+            }
+        }
+
+        // same update
+        return updateSet;
     }
 }

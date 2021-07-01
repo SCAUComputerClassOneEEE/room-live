@@ -5,6 +5,8 @@ import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  *
@@ -32,12 +34,12 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public void register(ServiceProvider peerNode, List<ServiceProvider> whichList, boolean sync) {
+    public void register(ServiceProvider peerNode, Map<String, Set<ServiceProvider>> whichList, boolean sync) {
 
     }
 
     @Override
-    public void renew() {
+    public void renew(ServiceProvider provider, boolean sync) {
 
     }
 
