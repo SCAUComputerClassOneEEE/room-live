@@ -66,7 +66,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
         * */
         HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                 .byClient(client)
-                .access(HttpMethod.POST, "/register")
+                .access(HttpMethod.POST, "/replicate")
                 .connectWith(peerNode)
                 .withBody(JSONUtil.writeValue(which))
                 .done(new ProcessedRunnable() {
