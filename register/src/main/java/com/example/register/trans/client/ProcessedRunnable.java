@@ -1,19 +1,35 @@
 package com.example.register.trans.client;
 
-public abstract class ProcessedRunnable<P> implements Runnable {
+import java.io.IOException;
 
-    private P process;
+public abstract class ProcessedRunnable implements Runnable {
+
+    private HttpTaskCarrierExecutor process;
 
     public ProcessedRunnable() { }
 
-    public void setExecutor(P process) { this.process = process; }
+    public void setExecutor(HttpTaskCarrierExecutor process) { this.process = process; }
 
     @Override
     @Deprecated
     public void run() {
-        processed(process);
+        if (process.isSuccess()) {
+            try {
+                successAndThen(process, process.getResultString());
+            } catch (Exception e) {
+                process.setParseSuccess(false);
+            }
+        } else {
+            failAndThen(process, process.getResultString());
+        }
     }
 
-    public abstract void processed(P process);
+    public void successAndThen(HttpTaskCarrierExecutor process, String resultString) throws Exception {
+
+    }
+
+    public void failAndThen(HttpTaskCarrierExecutor process, String resultString) {
+
+    }
 
 }

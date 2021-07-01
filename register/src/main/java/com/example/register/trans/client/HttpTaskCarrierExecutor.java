@@ -11,6 +11,7 @@ import io.netty.handler.codec.http.*;
 import io.netty.util.internal.ObjectUtil;
 
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -21,14 +22,14 @@ import java.util.concurrent.Future;
  * @since 2021/6/19 16:47
  **/
 public class HttpTaskCarrierExecutor {
-    private Bootstrap bootstrap; // how
     private ServiceProvider provider; // where
     private FullHttpRequest httpRequest; // for what
     private volatile TaskExecuteResult result;
     private boolean parseSuccess;
     private String taskId;
-    private ProcessedRunnable<HttpTaskCarrierExecutor> doneTodo;
+    private ProcessedRunnable doneTodo;
     private volatile Future<?> syncer;
+    private ApplicationClient client;
 
     private HttpTaskCarrierExecutor() {}
 
@@ -39,20 +40,19 @@ public class HttpTaskCarrierExecutor {
     private Runnable getDoneTodo() { return doneTodo; }
 
     public static class Builder {
-        private Bootstrap builderBootstrap;
         private ServiceProvider builderProvider;
         private FullHttpRequest builderRequest;
         private ByteBuf bodyBuf;
         private HttpHeaders builderHeaders;
-        private ProcessedRunnable<HttpTaskCarrierExecutor> builderRunnable;
-        private String taskId;
+        private ProcessedRunnable builderRunnable;
+        private ApplicationClient builderClient;
 
         public static Builder builder() { return new Builder(); }
 
         private Builder() { }
 
-        public Builder byBootstrap(Bootstrap bootstrap) {
-            this.builderBootstrap = bootstrap;
+        public Builder byClient(ApplicationClient client) {
+            this.builderClient = client;
             return this;
         }
 
@@ -61,7 +61,7 @@ public class HttpTaskCarrierExecutor {
             return this;
         }
 
-        public Builder done(ProcessedRunnable<HttpTaskCarrierExecutor> runnable) {
+        public Builder done(ProcessedRunnable runnable) {
             builderRunnable = runnable;
             return this;
         }
@@ -73,8 +73,6 @@ public class HttpTaskCarrierExecutor {
             if (builderHeaders == null) {
                 builderHeaders = new DefaultHttpHeaders();
             }
-            if (h.equals("taskId"))
-                taskId = (String)o;
             builderHeaders.add(h, o);
             return this;
         }
@@ -95,18 +93,22 @@ public class HttpTaskCarrierExecutor {
         public HttpTaskCarrierExecutor create() {
             final HttpTaskCarrierExecutor target = new HttpTaskCarrierExecutor();
 
-            builderRequest.replace(bodyBuf);
+            builderRequest.replace(
+                    bodyBuf == null ?
+                    Unpooled.copiedBuffer("", StandardCharsets.UTF_8) : bodyBuf
+            );
             builderRunnable.setExecutor(target);
 
-            ObjectUtil.checkNotNull(builderBootstrap, "builderProvider is null");
+            ObjectUtil.checkNotNull(builderClient, "builderClient is null");
             ObjectUtil.checkNotNull(builderProvider, "builderProvider is null");
-            ObjectUtil.checkNotNull(builderRequest, "builderRequest is null");
+            ObjectUtil.checkNotNull(builderRequest, "builderRequest is null, access pre.");
 
-            target.bootstrap = builderBootstrap;
+            target.client = builderClient;
             target.provider = builderProvider;
             target.httpRequest = builderRequest;
+            target.taskId = UUID.randomUUID().toString();
+            builderHeaders.add("taskId", target.taskId);
             target.httpRequest.headers().add(builderHeaders);
-            target.taskId = taskId;
             target.doneTodo = builderRunnable;
             return target;
         }
@@ -153,7 +155,6 @@ public class HttpTaskCarrierExecutor {
         }
     }
 
-
     /*
     *                               ...
     *                               /|\
@@ -176,12 +177,12 @@ public class HttpTaskCarrierExecutor {
     *                               \|/                                   |
     *                        channel inactive --> SUCCESS           --> syncSuccess
     * */
-    public void syncSuccess(FullHttpResponse result) {
+    public void success(FullHttpResponse result) {
         setResult(result);
         syncResult();
     }
 
-    public void syncFail(ResultType type, Throwable cause) {
+    public void fail(ResultType type, Throwable cause) {
         setResult(type, cause);
         syncResult();
     }
@@ -201,12 +202,12 @@ public class HttpTaskCarrierExecutor {
     public void connectAndSend() {
         try {
             // connect
-            ChannelFuture sync = bootstrap.connect(provider.getInfo().host(), provider.getInfo().port()).await();
+            ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getInfo().host(), provider.getInfo().port()).await();
             if (!sync.isSuccess()) {
                 /*
                 connect time out
                 */
-                syncFail(ResultType.CONNECT_TIME_OUT, new Exception("connect time out with" + provider.getInfo()));
+                fail(ResultType.CONNECT_TIME_OUT, new Exception("connect time out with" + provider.getInfo()));
                 return;
             }
             /*
@@ -216,11 +217,11 @@ public class HttpTaskCarrierExecutor {
             ChannelFuture send = sync.channel().writeAndFlush(httpRequest);
             send.addListener((ChannelFutureListener) channelFuture -> HttpTaskExecutorPool.taskMap.put(taskId, this));
         } catch (Exception e) {
-            syncFail(ResultType.RUNTIME_EXCEPTION, e);
+            fail(ResultType.RUNTIME_EXCEPTION, e);
         }
     }
 
-    public boolean success() {
+    public boolean isSuccess() {
         return result.success() && parseSuccess;
     }
 
@@ -255,5 +256,9 @@ public class HttpTaskCarrierExecutor {
     private void setResult(ResultType type, Throwable cause) {
         this.result = new TaskExecuteResult(type);
         this.result.setCause(cause);
+    }
+
+    public void sub() throws Exception {
+        client.subTask(this);
     }
 }

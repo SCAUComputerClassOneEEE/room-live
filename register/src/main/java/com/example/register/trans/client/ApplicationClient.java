@@ -34,15 +34,11 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
     private static BlockingQueue<HttpTaskCarrierExecutor> mainQueue; // public level 1
     private static BlockingQueue<HttpTaskCarrierExecutor> subQueue;
 
-    private final int taskQueueMaxSize;
-    private final int nextSize;
-
     private static final HttpTaskQueueConsumer runner = new HttpTaskQueueConsumer(); // 可以改成多个子执行器 list，麻烦。。。
 
-    public ApplicationClient(int taskQueueMaxSize, int nextSize) {
+    public ApplicationClient(Application application, ServiceProvidersBootConfig config) throws Exception {
         super(runner);
-        this.taskQueueMaxSize = taskQueueMaxSize;
-        this.nextSize = nextSize;
+        init(application, config);
     }
 
     @Override
@@ -75,9 +71,11 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
                     }
                 });
 
-        mainQueue = new LinkedBlockingQueue<>(taskQueueMaxSize);
-        subQueue = new LinkedBlockingQueue<>(nextSize);
-        runner.init(mainQueue, subQueue);
+        mainQueue = new LinkedBlockingQueue<>(config.getTaskQueueMaxSize());
+        subQueue = new LinkedBlockingQueue<>(config.getNextSize());
+        runner.init(mainQueue, subQueue,
+                config.getMaxTolerateTimeMills(),
+                config.getHeartBeatIntervals());
     }
 
     @Override

@@ -12,7 +12,7 @@ public abstract class ApplicationThread<B extends AbstractBootstrap<B, C>, C ext
     public ApplicationThread(Runnable runnable) {
         super(runnable);
     }
-    public abstract void init(Application application, ServiceProvidersBootConfig config) throws Exception;
+    protected abstract void init(Application application, ServiceProvidersBootConfig config) throws Exception;
     public abstract void stopThread();
 
     public AbstractBootstrap<B, C> getBootstrap() {

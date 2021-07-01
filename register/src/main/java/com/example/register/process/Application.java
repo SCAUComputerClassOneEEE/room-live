@@ -8,7 +8,6 @@ import com.example.register.serviceInfo.ServiceProvidersBootConfig;
  * 实现有两方面：client 和 server，他们有共同的行为：初始化，启动，关闭
  */
 public interface Application {
-    void init(ServiceProvidersBootConfig config) throws Exception;
     void start();
     void stop();
 }

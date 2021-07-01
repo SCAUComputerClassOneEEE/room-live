@@ -2,6 +2,7 @@ package com.example.register.process;
 
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.util.Collection;
 import java.util.List;
@@ -23,13 +24,15 @@ public interface RegistryClient extends Application {
 
     /**
      *
-     * 向 server 注册
-     * POST /register
+     * 同步数据，对自己的数据表更新，同时向 peer 推更新：
+     * - 如果是来自client的更新就发出对peers的同步；
+     * - 否则不再向远同步。
+     * POST /replicate
      */
-    void register(ServiceProvider peerNode, ServiceProvider which, boolean sync);
+    void replicate(ServiceProvider peerNode, ServiceProvider which, boolean sync) throws Exception;
 
     /**
-     *
+     * 心跳
      * 向 server 续约更新，版本迭代
      * PUT /renew
      */

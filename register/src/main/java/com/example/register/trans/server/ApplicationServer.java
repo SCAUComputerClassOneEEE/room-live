@@ -25,14 +25,14 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
     private final EventLoopGroup boosGroup = new NioEventLoopGroup(1);
     private final EventLoopGroup workerGroup = new NioEventLoopGroup(1);
     private int port;
-    private ChannelFuture bind;
 
     private static final Runnable runnable = () -> {
 
     };
 
-    public ApplicationServer() {
+    public ApplicationServer(Application application, ServiceProvidersBootConfig config) throws Exception {
         super(runnable);
+        init(application, config);
     }
 
     @Override

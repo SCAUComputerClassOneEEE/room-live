@@ -8,7 +8,6 @@ import com.example.register.trans.client.ProcessedRunnable;
 import com.example.register.trans.server.ApplicationServer;
 import com.example.register.utils.JSONUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.handler.codec.http.HttpMethod;
 
 import java.util.*;
@@ -21,24 +20,19 @@ import java.util.*;
  */
 public class NameCenterPeerProcess extends DiscoveryNodeProcess implements RegistryServer {
 
-    private static final NameCenterPeerProcess INSTANCE = new NameCenterPeerProcess();
-
     private ApplicationServer server;
 
     // 基础通信：client 和 server
 
     // 注册表
 
-    private NameCenterPeerProcess() {
-
+    public NameCenterPeerProcess(ServiceProvidersBootConfig config) throws Exception {
+        super(config);
+        init(config);
     }
 
-    public static NameCenterPeerProcess getInstance() {
-        return INSTANCE;
-    }
     /**
      *
-     * 只能对table的初始化和读，不能写！！！
      * 初始化，启动数据的远端同步
      * setup 0 从参数 config 中初始化 peers 列表
      *      -
@@ -51,21 +45,15 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
      * setup 3 准备对外服务
      */
     @Override
-    public void init(ServiceProvidersBootConfig config) throws Exception {
-        super.init(config);
+    protected void init(ServiceProvidersBootConfig config) throws Exception {
         if (config.getServerClusterType().equals(ClusterType.P2P)) {
-            Iterator<ServiceProvider> servers = table.getServers();
-            while (servers.hasNext()) {
-                if (syncAll(servers.next(), true)) break;
-                servers.remove();
-            }
+            syncAll(myPeerNode, true);
         }
         /*
         *
         * start server
         * */
-        server = new ApplicationServer();
-        server.init(this, config);
+        server = new ApplicationServer(this, config);
     }
 
     /**
@@ -89,43 +77,32 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
     }
 
     @Override
-    public void replicate() {
-        String url = "replicate";
-        String taskId = UUID.randomUUID().toString();
-    }
-
-    @Override
-    public boolean syncAll(ServiceProvider peerNode, boolean sync) throws Exception {
+    public void syncAll(ServiceProvider peerNode, boolean sync) throws Exception {
         HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
-                .byBootstrap((Bootstrap) client.getBootstrap())
+                .byClient(client)
                 .access(HttpMethod.GET, "/syncAll")
                 .connectWith(peerNode)
-                .addHeader("taskId", UUID.randomUUID().toString())
-                .done(new ProcessedRunnable<HttpTaskCarrierExecutor>() {
+                .done(new ProcessedRunnable() {
                     @Override
-                    public void processed(HttpTaskCarrierExecutor executor) {
-                        if (executor.success()) {
-                            String peerTables = executor.getResultString();
-                            try {
-                                Map<String, Set<ServiceProvider>> serviceProviders = JSONUtil.readMapSetValue(peerTables,
-                                        new TypeReference<Map<String, Set<ServiceProvider>>>() {});
-
-                                Map<String, Set<ServiceProvider>> selfHigherList = table.compareAndReturnUpdate(serviceProviders);
-                                if (!selfHigherList.isEmpty()) {
-                                    // replicate
-                                }
-                            } catch (Exception e) {
-                                executor.setParseSuccess(false);
-                            }
+                    public void successAndThen(HttpTaskCarrierExecutor process, String resultString) throws Exception {
+                        Map<String, Set<ServiceProvider>> serviceProviders = JSONUtil.readMapSetValue(resultString,
+                                new TypeReference<Map<String, Set<ServiceProvider>>>() {});
+                        Map<String, Set<ServiceProvider>> selfHigherList = table.compareAndReturnUpdate(serviceProviders);
+                        if (!selfHigherList.isEmpty()) {
+                            // replicate
                         }
                     }
-                }).withBody("").create();
+
+                    @Override
+                    public void failAndThen(HttpTaskCarrierExecutor process, String resultString) {
+
+                    }
+                }).create();
         /*block to sub taskQueue*/
-        client.subTask(executor);
-        if (sync)
+        executor.sub();
+        if (sync) {
             executor.sync();
-        else return false;
-        return executor.success() & executor.isParseSuccess();
+        }
     }
 
     @Override
@@ -136,9 +113,5 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
          * if one peer is inactive, remove from table
          * */
         return false;
-    }
-
-    private boolean lockForStatus() {
-        return true;
     }
 }

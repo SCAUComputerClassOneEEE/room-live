@@ -22,6 +22,8 @@ public class ServiceProvidersBootConfig {
     private int clientSubExecutors;
     private int connectTimeOut; // mills
     private int readTimeOut; // mills
+    private int maxTolerateTimeMills;
+    private int heartBeatIntervals;
 
     /*
     * server
@@ -34,6 +36,14 @@ public class ServiceProvidersBootConfig {
     private Comparator<ServiceProvider> tableSetRankComparator;
 
     public int getBackLog() { return backLog; }
+
+    public int getHeartBeatIntervals() { return heartBeatIntervals; }
+
+    public void setHeartBeatIntervals(int heartBeatIntervals) { this.heartBeatIntervals = heartBeatIntervals; }
+
+    public int getMaxTolerateTimeMills() { return maxTolerateTimeMills; }
+
+    public void setMaxTolerateTimeMills(int maxTolerateTimeMills) { this.maxTolerateTimeMills = maxTolerateTimeMills; }
 
     public void setBackLog(int backLog) { this.backLog = backLog; }
 

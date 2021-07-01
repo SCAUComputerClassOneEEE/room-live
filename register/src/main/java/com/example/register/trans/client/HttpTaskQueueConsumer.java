@@ -11,7 +11,8 @@ public class HttpTaskQueueConsumer implements Runnable{
 
     private Thread thread;
 
-    private static final long maxTolerateTimeMills = 2;
+    private int maxTolerateTimeMills;
+    private int heartBeatIntervals;
 
     private BlockingQueue<HttpTaskCarrierExecutor> selfNextTaskQueue;
 
@@ -49,8 +50,13 @@ public class HttpTaskQueueConsumer implements Runnable{
         });
     }
 
-    public void init(BlockingQueue<HttpTaskCarrierExecutor> mainQueue, BlockingQueue<HttpTaskCarrierExecutor> subQueue) {
+    public void init(BlockingQueue<HttpTaskCarrierExecutor> mainQueue,
+                     BlockingQueue<HttpTaskCarrierExecutor> subQueue,
+                     int mTT,
+                     int hbI) {
+        heartBeatIntervals = hbI;
         taskQueue = mainQueue;
+        maxTolerateTimeMills = mTT;
         selfNextTaskQueue = subQueue;
     }
 //

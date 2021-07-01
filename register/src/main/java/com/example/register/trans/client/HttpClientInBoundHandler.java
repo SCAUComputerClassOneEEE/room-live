@@ -55,7 +55,7 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
             error = ResultType.UNKNOWN;
         }
 
-        executor.syncFail(error, cause);
+        executor.fail(error, cause);
     }
 
     private HttpTaskCarrierExecutor getExecutor(ChannelHandlerContext ctx) {
@@ -76,6 +76,6 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
             throw new RuntimeException("map haven't this task: " + getTaskId(ctx));
         }
 
-        executor.syncSuccess(response);
+        executor.success(response);
     }
 }
