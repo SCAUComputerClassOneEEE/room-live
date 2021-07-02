@@ -1,6 +1,7 @@
 package com.example.register.trans.client;
 
 import com.example.register.process.Application;
+import com.example.register.process.DiscoveryNodeProcess;
 import com.example.register.process.RegistryClient;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.ApplicationThread;
@@ -42,7 +43,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
     }
 
     @Override
-    public void init(Application application, ServiceProvidersBootConfig config) throws Exception {
+    protected void init(Application application, ServiceProvidersBootConfig config) throws Exception {
         if (this.isAlive()) return;
 
         if (application instanceof RegistryClient) {
@@ -75,7 +76,8 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
         subQueue = new LinkedBlockingQueue<>(config.getNextSize());
         runner.init(mainQueue, subQueue,
                 config.getMaxTolerateTimeMills(),
-                config.getHeartBeatIntervals());
+                config.getHeartBeatIntervals(),
+                app);
     }
 
     @Override
@@ -100,5 +102,76 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             }
         } while (true);
 
+    }
+
+    protected static class HttpTaskQueueConsumer implements Runnable{
+        static BlockingQueue<HttpTaskCarrierExecutor> taskQueue;
+        static final HttpTaskExecutorPool pool = HttpTaskExecutorPool.getInstance();
+        RegistryClient client;
+        Thread thread;
+
+        int maxTolerateTimeMills;
+        int heartBeatIntervals;
+
+        BlockingQueue<HttpTaskCarrierExecutor> selfNextTaskQueue;
+
+        @Override
+        public void run() {
+            thread = Thread.currentThread();
+            long lastDoPacket = System.currentTimeMillis();
+            long lastRenewStamp = System.currentTimeMillis();
+            while (true) {
+                try {
+                    HttpTaskCarrierExecutor take = taskQueue.take(); // 阻塞
+                    // thread pool submit to do
+                    if (!selfNextTaskQueue.offer(take)) { // 非阻塞
+                        // 满了
+                        doPacket();
+                        lastDoPacket = System.currentTimeMillis();
+                    } else { // 未满
+                        if (lastDoPacket - System.currentTimeMillis() >= maxTolerateTimeMills) {
+                            // 时间到了
+                            doPacket();
+                            lastDoPacket = System.currentTimeMillis();
+                        }
+                    }
+                    if (lastRenewStamp - System.currentTimeMillis() >= heartBeatIntervals) {
+                        client.renew(false); // 心跳
+                    }
+                } catch (Exception e) {
+                    // thread interrupt, and while break out
+                    break;
+                }
+            }
+        }
+
+        void doPacket() {
+            HttpTaskCarrierExecutor[] httpTaskCarrierExecutors = (HttpTaskCarrierExecutor[]) selfNextTaskQueue.toArray();
+            pool.submit(() -> {
+                for (HttpTaskCarrierExecutor executor : httpTaskCarrierExecutors)
+                    executor.connectAndSend();
+            });
+        }
+
+        void init(BlockingQueue<HttpTaskCarrierExecutor> mainQueue,
+                  BlockingQueue<HttpTaskCarrierExecutor> subQueue,
+                  int mTT,
+                  int hbI,
+                  RegistryClient app) {
+            client = app;
+            heartBeatIntervals = hbI;
+            taskQueue = mainQueue;
+            maxTolerateTimeMills = mTT;
+            selfNextTaskQueue = subQueue;
+        }
+//
+//    public void interrupt() {
+//        if (thread != null && thread.isAlive())
+//            thread.interrupt();
+//    }
+
+        Thread getThread() {
+            return thread;
+        }
     }
 }

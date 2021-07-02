@@ -30,7 +30,7 @@ public class JSONUtil {
         return mapper.writeValueAsString(o);
     }
 
-    public static <K, T> Map<K, Set<T>> readMapSetValue(String str, TypeReference<Map<K, Set<T>>> typeReference) throws IOException {
-        return mapper.readValue(str, typeReference);
+    public static <K, T> Map<K, Set<T>> readMapSetValue(String str) throws IOException {
+        return mapper.readValue(str, new TypeReference<Map<K, Set<T>>>(){});
     }
 }

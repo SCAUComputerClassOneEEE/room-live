@@ -5,18 +5,33 @@ import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
 import com.example.register.trans.client.ProcessedRunnable;
+import com.example.register.trans.client.ResultType;
 import com.example.register.trans.server.ApplicationServer;
 import com.example.register.utils.JSONUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpResponseStatus;
 
 import java.util.*;
 
 /**
  *
- * 单例
+ * 集群中的 server，继承 Application
  *
- * 开启两个线程，serverThread 和 clientThread
+ * GET：syncAll
+ *
+ * --> 200 请求成功，对方返回的数据是可解析的
+ *
+ * --> 303 不存在该类数据（对于syncAll对方尚未全同步结束），对方希望请求别的peer
+ * --> 500 服务器异常，重新register到别的peer，再进行syncAll
+ *
+ *
+ * HEAD: isActive
+ *
+ * --> 200 请求成功，对方返回的请求头包含active内容
+ *
+ * --> 404 对方不存在需要检测的数据
+ * --> 500 服务器异常，重新register到别的peer，再进行isActive
  */
 public class NameCenterPeerProcess extends DiscoveryNodeProcess implements RegistryServer {
 
@@ -47,7 +62,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
     @Override
     protected void init(ServiceProvidersBootConfig config) throws Exception {
         if (config.getServerClusterType().equals(ClusterType.P2P)) {
-            syncAll(myPeerNode, true);
+            syncAll(true);
         }
         /*
         *
@@ -64,6 +79,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
     @Override
     public void start() {
         // only once
+        super.start();
         server.start();
     }
 
@@ -73,36 +89,19 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
      */
     @Override
     public void stop() {
-
+        super.stop();
+        server.stopThread();
     }
 
     @Override
-    public void syncAll(ServiceProvider peerNode, boolean sync) throws Exception {
-        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
-                .byClient(client)
-                .access(HttpMethod.GET, "/syncAll")
-                .connectWith(peerNode)
-                .done(new ProcessedRunnable() {
-                    @Override
-                    public void successAndThen(HttpTaskCarrierExecutor process, String resultString) throws Exception {
-                        Map<String, Set<ServiceProvider>> serviceProviders = JSONUtil.readMapSetValue(resultString,
-                                new TypeReference<Map<String, Set<ServiceProvider>>>() {});
-                        Map<String, Set<ServiceProvider>> selfHigherList = table.compareAndReturnUpdate(serviceProviders);
-                        if (!selfHigherList.isEmpty()) {
-                            // replicate
-                        }
-                    }
-
-                    @Override
-                    public void failAndThen(HttpTaskCarrierExecutor process, String resultString) {
-
-                    }
-                }).create();
-        /*block to sub taskQueue*/
-        executor.sub();
-        if (sync) {
-            executor.sync();
+    public void syncAll(boolean sync) throws Exception {
+        Set<String> apps = table.getAllAsMapSet().keySet();
+        StringBuilder sb = new StringBuilder();
+        for (String app : apps) {
+            sb.append(app).append(",");
         }
+        sb.deleteCharAt(sb.length() - 1);
+        discover(myPeer, sb.toString(), sync);
     }
 
     @Override
@@ -113,33 +112,5 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
          * if one peer is inactive, remove from table
          * */
         return false;
-    }
-
-    @Override
-    public void replicate(ServiceProvider peerNode, ServiceProvider which, boolean sync) throws Exception {
-        /*
-         * myPeerNode = peerNode;
-         * */
-        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
-                .byClient(client)
-                .access(HttpMethod.POST, "/replicate")
-                .connectWith(peerNode)
-                .withBody(JSONUtil.writeValue(which))
-                .done(new ProcessedRunnable() {
-                    @Override
-                    public void successAndThen(HttpTaskCarrierExecutor process, String resultString) throws Exception {
-
-                    }
-
-                    @Override
-                    public void failAndThen(HttpTaskCarrierExecutor process, String resultString) {
-
-                    }
-                }).create();
-        executor.sub();
-        if (sync) {
-            executor.sync();
-        }
-
     }
 }

@@ -1,6 +1,6 @@
 package com.example.register.trans.client;
 
-import java.io.IOException;
+import io.netty.handler.codec.http.HttpResponseStatus;
 
 public abstract class ProcessedRunnable implements Runnable {
 
@@ -8,27 +8,43 @@ public abstract class ProcessedRunnable implements Runnable {
 
     public ProcessedRunnable() { }
 
-    public void setExecutor(HttpTaskCarrierExecutor process) { this.process = process; }
+    protected void setExecutor(HttpTaskCarrierExecutor process) { this.process = process; }
 
     @Override
-    @Deprecated
-    public void run() {
-        if (process.isSuccess()) {
+    public final void run() {
+        if (process.execSuccess()) {
             try {
-                successAndThen(process, process.getResultString());
+                successAndThen(process.getResultStatus(), process.getResultString());
             } catch (Exception e) {
-                process.setParseSuccess(false);
+                System.out.println("i don't know what happened, maybe json parsing.");
+                e.printStackTrace();
             }
         } else {
-            failAndThen(process, process.getResultString());
+            try {
+                failAndThen(process.getErrorType(), process.getResultString());
+            } catch (Exception e) {
+                System.out.println("i don't know what happened, maybe json parsing.");
+                e.printStackTrace();
+            }
+        }
+        synchronized (process.getLock()) {
+            process.getLock().notify();
         }
     }
 
-    public void successAndThen(HttpTaskCarrierExecutor process, String resultString) throws Exception {
+    /**
+     * @param resultString HTTP 请求成功后的返回jsonString
+     * @param status HTTP 请求成功后的返回状态码
+     * */
+    public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
 
     }
 
-    public void failAndThen(HttpTaskCarrierExecutor process, String resultString) {
+    /**
+     * @param resultString HTTP 请求失败后的报错信息
+     * @param errorType HTTP 请求失败的出错状态
+     * */
+    public void failAndThen(ResultType errorType, String resultString) throws Exception {
 
     }
 

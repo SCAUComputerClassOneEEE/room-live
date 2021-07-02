@@ -18,26 +18,21 @@ import java.util.concurrent.Future;
 /**
  *
  * 只用于发送 http 请求
+ *
+ * 可同步可嵌套提交的任务执行器
  * @author hiluyx
  * @since 2021/6/19 16:47
  **/
 public class HttpTaskCarrierExecutor {
+    private final Object lock = new Object();
     private ServiceProvider provider; // where
     private FullHttpRequest httpRequest; // for what
     private volatile TaskExecuteResult result;
-    private boolean parseSuccess;
     private String taskId;
     private ProcessedRunnable doneTodo;
-    private volatile Future<?> syncer;
-    private ApplicationClient client;
+    private ApplicationClient client; // 发送http
 
     private HttpTaskCarrierExecutor() {}
-
-    public boolean isParseSuccess() { return parseSuccess; }
-
-    public void setParseSuccess(boolean parseSuccess) { this.parseSuccess = parseSuccess; }
-
-    private Runnable getDoneTodo() { return doneTodo; }
 
     public static class Builder {
         private ServiceProvider builderProvider;
@@ -140,6 +135,10 @@ public class HttpTaskCarrierExecutor {
 
         void setCause(Throwable cause) { this.cause = cause; }
 
+        ResultType getState() {
+            return state;
+        }
+
         boolean success() { return state.equals(ResultType.SUCCESS); }
 
         void release() {
@@ -160,11 +159,11 @@ public class HttpTaskCarrierExecutor {
     }
 
     /*
-    *                               ...
+    *                               ... parent thread processing
     *                               /|\
     *                                |   false
-    * builder --> create --> subTask --> (sync?)              doneRunnable to do -->
-    *                                |   true to wait                    /|\
+    * builder --> create --> subTask --> (sync?)              doneRunnable to do --> parent thread is notified
+    *                                |   true, to wait                   /|\
     *                                |                                    |
     *                               sync                                  |
     *                                |                                    |
@@ -181,29 +180,17 @@ public class HttpTaskCarrierExecutor {
     *                               \|/                                   |
     *                        channel inactive --> SUCCESS           --> syncSuccess
     * */
-    public void success(FullHttpResponse result) {
+    protected void success(FullHttpResponse result) {
         setResult(result);
-        syncResult();
+        HttpTaskExecutorPool.getInstance().submit(this.doneTodo);
     }
 
-    public void fail(ResultType type, Throwable cause) {
+    protected void fail(ResultType type, Throwable cause) {
         setResult(type, cause);
-        syncResult();
+        HttpTaskExecutorPool.getInstance().submit(this.doneTodo);
     }
 
-    private void syncResult() {
-        HttpTaskExecutorPool pool = HttpTaskExecutorPool.getInstance();
-        synchronized (this) {
-            /*
-            * maybe none wait for this
-            * so it need the pool to background exec
-            * */
-            this.syncer = pool.submit(this::getDoneTodo);
-            this.notify();
-        }
-    }
-
-    public void connectAndSend() {
+    protected void connectAndSend() {
         try {
             // connect
             ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getInfo().host(), provider.getInfo().port()).await();
@@ -225,15 +212,19 @@ public class HttpTaskCarrierExecutor {
         }
     }
 
-    public boolean isSuccess() {
-        return result.success() && parseSuccess;
+    protected boolean execSuccess() {
+        return result.success();
     }
 
-    public HttpResponseStatus getResultStatus() {
+    protected HttpResponseStatus getResultStatus() {
         return result.getResult().status();
     }
 
-    public String getResultString() {
+    protected ResultType getErrorType() {
+        return result.getState();
+    }
+
+    protected String getResultString() {
         String rs;
         try {
             rs = result.resultString();
@@ -245,12 +236,18 @@ public class HttpTaskCarrierExecutor {
         return rs;
     }
 
-    public void sync() throws ExecutionException, InterruptedException {
-        synchronized (this) {
-            if (syncer == null)
-                this.wait();
-            syncer.get();
+    public void sub() throws Exception {
+        client.subTask(this);
+    }
+
+    public void sync() throws InterruptedException {
+        synchronized (lock) {
+            lock.wait(); // 阻塞等待done Runnable的任务结束，这时候syncer可能为null
         }
+    }
+
+    protected Object getLock() {
+        return lock;
     }
 
     private void setResult(FullHttpResponse response) {
@@ -260,9 +257,5 @@ public class HttpTaskCarrierExecutor {
     private void setResult(ResultType type, Throwable cause) {
         this.result = new TaskExecuteResult(type);
         this.result.setCause(cause);
-    }
-
-    public void sub() throws Exception {
-        client.subTask(this);
     }
 }

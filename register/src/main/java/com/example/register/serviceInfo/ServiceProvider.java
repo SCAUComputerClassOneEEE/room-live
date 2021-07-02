@@ -13,9 +13,9 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
 
     private String appName;
     private String mask;
-
     private InstanceInfo info;
 
+    private transient long lastRenewStamp;
     private AtomicInteger connectingInt; // 正在连接数
     private AtomicInteger historyInt; // 历史连接数
     private AtomicDouble avgAccess; // 平均响应时间

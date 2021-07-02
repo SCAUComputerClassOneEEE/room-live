@@ -15,7 +15,7 @@ public abstract class ApplicationThread<B extends AbstractBootstrap<B, C>, C ext
     protected abstract void init(Application application, ServiceProvidersBootConfig config) throws Exception;
     public abstract void stopThread();
 
-    public AbstractBootstrap<B, C> getBootstrap() {
+    public final AbstractBootstrap<B, C> getBootstrap() {
         return bootstrap;
     }
 }

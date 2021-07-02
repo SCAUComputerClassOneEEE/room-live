@@ -4,25 +4,36 @@ import com.example.register.utils.CollectionUtil;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiConsumer;
-import java.util.stream.Stream;
 
 /**
- *
- *
  * map appName --> ServiceProvider
- *
  */
 public class ServiceApplicationsTable {
 
     public static final String SERVER_PEER_NODE = "server-peer-node-service";
     public static final String DEFAULT_CLIENT_APPLICATION = "default_client-application";
 
-    private volatile ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> doubleMarkMap;
-
-    public ServiceApplicationsTable() {
-
-    }
+    /*
+    *
+    * 双索引的哈希表
+    * x-----x-----x-----x-----x-----x-----x-----x
+    * | app | app | ... | ... | ... | app | ... |
+    * x-----x-----x-----x-----x-----x-----x-----x
+    *    |     |                       |
+    *    |    \|/                     \|/
+    *    |     x-----x-----x-----x     x-----x-----x-----x
+    *    |     | msk | ... | ... |     | ... | msk | ... |
+    *    |     x-----x-----x-----x     x-----x-----x-----x
+    *   \|/
+    *    x-----x-----x-----x
+    *    | msk | msk | ... |
+    *    x-----x-----x-----x
+    * 一级索引存放appName，一类服务的name
+    * 二级索引存放mask，serviceProvider的唯一id
+    *
+    * 持久化依靠数据库。
+    * */
+    private final ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> doubleMarkMap;
 
     public ServiceApplicationsTable(ServiceProvidersBootConfig config, /*初始化时候的服务列表*/
                                     String selfAppName/*自己的appName*/) {
@@ -39,20 +50,47 @@ public class ServiceApplicationsTable {
         doubleMarkMap.put(SERVER_PEER_NODE, othersSet);
     }
 
-    public void remove(String appName) {
+    public void removeApps(String appName) {
         doubleMarkMap.remove(appName);
     }
 
-    public void remove(ServiceProvider serviceProvider) {
-        Map<String, ServiceProvider> serviceProviders = doubleMarkMap.get(serviceProvider.getAppName());
+    public void removeApp(ServiceProvider val) {
+        Map<String, ServiceProvider> thisApps = doubleMarkMap.get(val.getAppName());
+        if (thisApps == null)
+            return;
+        thisApps.remove(val.getMask());
     }
 
-    public void put(String appName, String host, int port) {
-
+    /**
+     *
+     * @param appName can be null, no char or
+     * @param newVal
+     */
+    public void putAppIfAbsent(String appName, ServiceProvider newVal) {
+        ConcurrentHashMap<String, ServiceProvider> thisApps;
+        if (appName == null || appName.equals("")) {
+            thisApps = defaultApps();
+        } else {
+            thisApps = doubleMarkMap.get(appName);
+            if (thisApps == null) {
+                thisApps = putNewAppsIfAbsent(appName);
+            }
+        }
+        thisApps.putIfAbsent(newVal.getMask(), newVal);
     }
 
-    public void put(String appName, ServiceProvider value) {
+    private ConcurrentHashMap<String, ServiceProvider> putNewAppsIfAbsent(String newAppName) {
+        ConcurrentHashMap<String, ServiceProvider> newApps = doubleMarkMap.get(newAppName);
+        if (newApps == null) {
+            newApps = new ConcurrentHashMap<>();
+            doubleMarkMap.put(newAppName, newApps);
+        }
 
+        return newApps;
+    }
+
+    private ConcurrentHashMap<String, ServiceProvider> defaultApps() {
+        return putNewAppsIfAbsent(DEFAULT_CLIENT_APPLICATION);
     }
 
     /**
@@ -63,7 +101,7 @@ public class ServiceApplicationsTable {
         Map<String, Set<ServiceProvider>> getMapList = new HashMap<>();
         while (apps.hasMoreElements() && ml -- > 0) {
             String s = apps.nextElement();
-            Set<ServiceProvider> asList = getAsSet(s);
+            Set<ServiceProvider> asList = getAppsAsSet(s);
             getMapList.put(s, asList);
         }
         return getMapList;
@@ -73,18 +111,28 @@ public class ServiceApplicationsTable {
      * @return servers for notifying
      */
     public Iterator<ServiceProvider> getServers() {
-        return getAsIterator(SERVER_PEER_NODE);
+        return getAppsAsIterator(SERVER_PEER_NODE);
+    }
+
+    /**
+     *
+     * 选择最优的serviceProvider
+     */
+    public ServiceProvider getOptimal(String appName) {
+        Set<ServiceProvider> appsAsSet = getAppsAsSet(appName);
+
+        return null;
     }
 
     /**
      * @param appName app name
      * @return app service
      */
-    public Iterator<ServiceProvider> getAsIterator(String appName) {
-        return getAsSet(appName).iterator();
+    public Iterator<ServiceProvider> getAppsAsIterator(String appName) {
+        return getAppsAsSet(appName).iterator();
     }
 
-    public Set<ServiceProvider> getAsSet(String appName) {
+    public Set<ServiceProvider> getAppsAsSet(String appName) {
         final Map<String, ServiceProvider> appSet = doubleMarkMap.get(appName);
         Set<ServiceProvider> list = new HashSet<>();
         if (appSet == null) return list;
@@ -92,9 +140,8 @@ public class ServiceApplicationsTable {
         return list;
     }
 
-
-    public Set<ServiceProvider> getAsClonedSet(String appName) throws CloneNotSupportedException {
-        final Set<ServiceProvider> asList = getAsSet(appName);
+    public Set<ServiceProvider> getAppsAsClonedSet(String appName) throws CloneNotSupportedException {
+        final Set<ServiceProvider> asList = getAppsAsSet(appName);
         Set<ServiceProvider> rls = new HashSet<>();
 
         for (ServiceProvider r : asList) {
@@ -103,7 +150,7 @@ public class ServiceApplicationsTable {
         return rls;
     }
 
-    public ServiceProvider get(String appName, String mask) {
+    public ServiceProvider getApp(String appName, String mask) {
         ServiceProvider rSP;
         if (appName == null || appName.equals("")) {
             if (mask == null || mask.equals(""))
@@ -126,7 +173,7 @@ public class ServiceApplicationsTable {
 
     /**
      * 与自身的比较并更新，并且返回返回版本更加高的，自身有而second没有的
-     * @param second 全同步的来源
+     * @param second appName和service provider的集合的键值映射
      * @return 返回版本更加高的
      */
     public Map<String, Set<ServiceProvider>> compareAndReturnUpdate(Map<String, Set<ServiceProvider>> second) {

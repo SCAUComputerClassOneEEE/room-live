@@ -5,5 +5,6 @@ public enum ResultType {
     CONNECT_TIME_OUT,
     READ_TIME_OUT,
     RUNTIME_EXCEPTION,
-    SUCCESS
+    SUCCESS,
+    INTERNAL_SERVER_ERROR
 }

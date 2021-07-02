@@ -36,7 +36,7 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
     }
 
     @Override
-    public void init(Application application, ServiceProvidersBootConfig config) throws Exception {
+    protected void init(Application application, ServiceProvidersBootConfig config) throws Exception {
         if (application instanceof RegistryServer) {
             app = (RegistryServer) application;
         } else {
