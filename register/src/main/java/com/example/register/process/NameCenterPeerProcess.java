@@ -88,7 +88,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
      * 停止对外服务
      */
     @Override
-    public void stop() {
+    public void stop() throws Exception {
         super.stop();
         server.stopThread();
     }

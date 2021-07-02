@@ -100,7 +100,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public void stop() {
+    public void stop() throws Exception {
         offline();
     }
 
@@ -122,39 +122,13 @@ public class DiscoveryNodeProcess implements RegistryClient{
                 throw new RuntimeException("server num is zero...no server is running now");
             myPeer = (ServiceProvider) servers[0];
         }
+        replicate(myPeer, mySelf, ReplicationAction.REGISTER, true, false);
+    }
 
-        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
-                .byClient(client)
-                .access(HttpMethod.POST, "/register")
-                .connectWith(myPeer)
-                .done(new ProcessedRunnable() {
-                    @Override
-                    public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
-                        if (status.equals(HttpResponseStatus.CREATED)) {
-                            // 请求成功，对方注册了该资源并且将replicate到其他peers
-                            // nothing
-                        } else if (status.equals(HttpResponseStatus.ACCEPTED)) {
-                            // 已经注册成功，不做处理
-                            // nothing
-                        } else {
-                            // server error
-                            table.removeApp(myPeer);
-                            myPeer = null;
-                            register();
-                        }
-                    }
-
-                    @Override
-                    public void failAndThen(ResultType errorType, String resultString) throws Exception {
-                        table.removeApp(myPeer);
-                        myPeer = null;
-                        register();
-                    }
-                }).create();
-        /*block to sub taskQueue*/
-        executor.sub();
-        /*wait until executor's doneRunnable end*/
-        executor.sync();
+    @Override
+    public void offline() throws Exception {
+        replicate(myPeer, mySelf, ReplicationAction.OFFLINE, true, false);
+        client.stopThread();
     }
 
     /**
@@ -166,36 +140,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
      * */
     @Override
     public final void renew(boolean sync) throws Exception {
-        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
-                .byClient(client)
-                .access(HttpMethod.PUT, "/renew")
-                .connectWith(myPeer)
-                .done(new ProcessedRunnable() {
-                    @Override
-                    public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
-                        if (status.equals(HttpResponseStatus.OK)) {
-                            // 请求成功，对方接受了该资源的修改（心跳维持状态）并且将replicate到其他peers
-
-                        } else if (status.equals(HttpResponseStatus.NOT_FOUND)) {
-                            // 不存在该实例，对方希望发送register
-                            register();
-                        } else {
-                            // 服务器异常，重新register到别的peer
-                            table.removeApp(myPeer);
-                            myPeer = null;
-                            register();
-                        }
-                    }
-
-                    @Override
-                    public void failAndThen(ResultType errorType, String resultString) throws Exception {
-                        table.removeApp(myPeer);
-                        myPeer = null;
-                        register();
-                    }
-                }).create();
-        /*block to sub taskQueue*/
-        executor.sub();
+        replicate(myPeer, mySelf, ReplicationAction.RENEW, sync, false);
     }
 
     @Override
@@ -240,16 +185,31 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public void replicate(ServiceProvider peerNode, ServiceProvider which, ReplicationAction action, boolean sync) throws Exception {
+    public void replicate(ServiceProvider goalPeerNode, ServiceProvider carryNode, ReplicationAction action, boolean sync, boolean comeFromPeer) throws Exception {
+        String url = action.getAction();
+        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
+                .byClient(client)
+                .access(HttpMethod.POST, url)
+                .connectWith(myPeer)
+                .done(new ProcessedRunnable() {
+                    @Override
+                    public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
 
-    }
+                    }
 
-    @Override
-    public void offline() {
-
-
+                    @Override
+                    public void failAndThen(ResultType errorType, String resultString) throws Exception {
+                        if (!action.equals(ReplicationAction.OFFLINE)) {
+                            table.removeApp(myPeer);
+                            myPeer = null;
+                            register();
+                        }
+                    }
+                }).create();
+        /*block to sub taskQueue*/
+        executor.sub();
         /*wait until executor's doneRunnable end*/
-
-        client.stopThread();
+        if (sync)
+            executor.sync();
     }
 }
