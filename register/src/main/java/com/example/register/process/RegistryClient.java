@@ -19,17 +19,31 @@ import java.util.concurrent.ConcurrentHashMap;
  * 2. 续约，
  * 3. 暂停，主动停止服务，暂停对外提供服务
  * 4. 下线，被动停止服务，一般是进程挂掉续约断了
+ *
+ * 收到的状态码：
+ * GET：discover
+ * --> 200 请求成功，对方返回的数据是可解析的
+ * --> 303 不存在该类数据（对于discover该资源还没有注册，或者已经下线），对方希望请求别的peer
+ * --> 406 对方不支持该资源类型的请求，（server只支持json）
+ * --> 500 服务器异常，重新register到别的peer，再进行discover
+ * POST: register
+ * --> 201 请求成功，对方注册了该资源并且将replicate到其他peers
+ * --> 202 已经注册成功，不做处理
+ * PUT: renew
+ * --> 200 请求成功，对方接受了该资源的修改（心跳维持状态）并且将replicate到其他peers
+ * --> 404 不存在该实例，对方希望发送register
+ * --> 500 服务器异常，重新register到别的peer，再进行renew
+ * DELETE: offline
+ * --> 200 下线成功
+ * --> 303 不存在该类数据（对于offline该资源还没有注册，或者已经下线）
+ * --> 409 下线失败，因为对方认为你下线了别的node
+ * --> 500 服务器异常，对别的peer进行offline
  */
 public interface RegistryClient extends Application {
 
-    /**
-     *
-     * 同步数据，对自己的数据表更新，同时向 peer 推更新：
-     * - 如果是来自client的更新就发出对peers的同步；
-     * - 否则不再向远同步。
-     * POST /replicate
-     */
-    void replicate(ServiceProvider peerNode, ServiceProvider which, boolean sync) throws Exception;
+
+
+    void register();
 
     /**
      * 心跳
@@ -47,14 +61,8 @@ public interface RegistryClient extends Application {
 
     /**
      *
-     * 暂停服务
-     *
-     */
-    void pause();
-
-    /**
-     *
      * 下线，停止服务
+     * DELETE
      */
     void offline();
 

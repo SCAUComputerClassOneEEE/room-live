@@ -114,4 +114,32 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
          * */
         return false;
     }
+
+    @Override
+    public void replicate(ServiceProvider peerNode, ServiceProvider which, boolean sync) throws Exception {
+        /*
+         * myPeerNode = peerNode;
+         * */
+        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
+                .byClient(client)
+                .access(HttpMethod.POST, "/replicate")
+                .connectWith(peerNode)
+                .withBody(JSONUtil.writeValue(which))
+                .done(new ProcessedRunnable() {
+                    @Override
+                    public void successAndThen(HttpTaskCarrierExecutor process, String resultString) throws Exception {
+
+                    }
+
+                    @Override
+                    public void failAndThen(HttpTaskCarrierExecutor process, String resultString) {
+
+                    }
+                }).create();
+        executor.sub();
+        if (sync) {
+            executor.sync();
+        }
+
+    }
 }

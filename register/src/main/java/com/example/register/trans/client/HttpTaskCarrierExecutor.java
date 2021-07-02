@@ -108,6 +108,10 @@ public class HttpTaskCarrierExecutor {
             target.httpRequest = builderRequest;
             target.taskId = UUID.randomUUID().toString();
             builderHeaders.add("taskId", target.taskId);
+            String accept = builderHeaders.get("Accept");
+            if (accept == null || accept.equals("")) {
+                builderHeaders.add("Accept", "application/json");
+            }
             target.httpRequest.headers().add(builderHeaders);
             target.doneTodo = builderRunnable;
             return target;

@@ -45,7 +45,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
         * */
         while (servers.hasNext()) {
             ServiceProvider next = servers.next();
-            replicate(next, mySelf, true);
+            // register
         }
     }
 
@@ -60,30 +60,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public void replicate(ServiceProvider peerNode, ServiceProvider which, boolean sync) throws Exception {
-        /*
-        * myPeerNode = peerNode;
-        * */
-        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
-                .byClient(client)
-                .access(HttpMethod.POST, "/replicate")
-                .connectWith(peerNode)
-                .withBody(JSONUtil.writeValue(which))
-                .done(new ProcessedRunnable() {
-                    @Override
-                    public void successAndThen(HttpTaskCarrierExecutor process, String resultString) throws Exception {
-
-                    }
-
-                    @Override
-                    public void failAndThen(HttpTaskCarrierExecutor process, String resultString) {
-
-                    }
-                }).create();
-        executor.sub();
-        if (sync) {
-            executor.sync();
-        }
+    public void register() {
 
     }
 
@@ -94,11 +71,6 @@ public class DiscoveryNodeProcess implements RegistryClient{
 
     @Override
     public void discover() {
-
-    }
-
-    @Override
-    public void pause() {
 
     }
 

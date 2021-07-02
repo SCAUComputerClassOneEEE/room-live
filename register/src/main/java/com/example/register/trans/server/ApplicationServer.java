@@ -56,7 +56,7 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline()
-                                .addLast(new WriteTimeoutHandler(writeTimeOut, TimeUnit.MILLISECONDS))
+                                .addLast(new WriteTimeoutHandler(writeTimeOut, TimeUnit.MILLISECONDS)) // 返回408
                                 .addLast(new HttpServerCodec())
                                 .addLast(new HttpObjectAggregator(maxContentLength))
                                 .addLast(new HttpServerHandler(app));
