@@ -2,6 +2,8 @@ package com.example.register.process;
 
 import com.example.register.serviceInfo.ServiceProvider;
 
+import java.util.Set;
+
 
 public interface RegistryServer extends Application, MethodNestable {
 

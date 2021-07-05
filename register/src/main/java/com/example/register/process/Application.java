@@ -10,4 +10,5 @@ import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 public interface Application {
     void start();
     void stop() throws Exception;
+    boolean isRunning();
 }

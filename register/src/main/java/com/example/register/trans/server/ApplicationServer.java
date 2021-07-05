@@ -1,6 +1,7 @@
 package com.example.register.trans.server;
 
 import com.example.register.process.Application;
+import com.example.register.process.NameCenterPeerProcess;
 import com.example.register.process.RegistryServer;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.ApplicationThread;
@@ -12,6 +13,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.timeout.WriteTimeoutHandler;
+import lombok.SneakyThrows;
 
 import java.util.concurrent.TimeUnit;
 
@@ -21,24 +23,57 @@ import java.util.concurrent.TimeUnit;
  **/
 public class ApplicationServer extends ApplicationThread<ServerBootstrap, ServerChannel> {
 
-    private RegistryServer app;
+    private NameCenterPeerProcess app;
     private final EventLoopGroup boosGroup = new NioEventLoopGroup(1);
     private final EventLoopGroup workerGroup = new NioEventLoopGroup(1);
-    private int port;
 
-    private static final Runnable runnable = () -> {
+    private static final ServerScanRunnable runnable = new ServerScanRunnable();
 
-    };
+    protected static class ServerScanRunnable implements Runnable{
+        ApplicationServer server;
+
+        void setServer(ApplicationServer server) {
+            this.server = server;
+        }
+
+        @Override
+        public void run() {
+            final ServerBootstrap bootstrap = (ServerBootstrap) server.bootstrap;
+            NameCenterPeerProcess app = server.app;
+            try {
+                ChannelFuture bind = bootstrap.bind().sync();
+                if (bind.isSuccess()) {
+                    while (true) {
+                        try {
+
+                        } catch (Exception e) {
+                            break;
+                        }
+                    }
+                } else {
+                    server.stopThread();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally{
+                server.stopThread();
+            }
+
+        }
+    }
 
     public ApplicationServer(Application application, ServiceProvidersBootConfig config) throws Exception {
         super(runnable);
+        runnable.setServer(this);
         init(application, config);
     }
 
     @Override
     protected void init(Application application, ServiceProvidersBootConfig config) throws Exception {
-        if (application instanceof RegistryServer) {
-            app = (RegistryServer) application;
+        if (this.isAlive()) return;
+
+        if (application instanceof NameCenterPeerProcess) {
+            app = (NameCenterPeerProcess) application;
         } else {
             throw new Exception("server application thread init error.");
         }
@@ -46,7 +81,7 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
         final Integer writeTimeOut = config.getWriteTimeOut();
         final int maxContentLength = config.getMaxContentLength();
         final int backLog = config.getBackLog();
-        port = config.getServerPort();
+        int port = config.getServerPort();
         ((ServerBootstrap) bootstrap)
                 .group(boosGroup, workerGroup)
                 .localAddress(port)
@@ -66,6 +101,10 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
 
     @Override
     public void stopThread() {
-
+        super.stopThread();
+        if (!boosGroup.isTerminated())
+            boosGroup.shutdownGracefully();
+        if (!workerGroup.isTerminated())
+        workerGroup.shutdownGracefully();
     }
 }

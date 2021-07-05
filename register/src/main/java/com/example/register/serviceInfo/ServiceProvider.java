@@ -1,10 +1,14 @@
 package com.example.register.serviceInfo;
 
 
+import com.example.register.utils.JSONUtil;
 import com.google.common.util.concurrent.AtomicDouble;
+import lombok.SneakyThrows;
 
 import java.io.Serializable;
+import java.sql.Timestamp;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -13,19 +17,21 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
 
     private String appName;
     private String mask;
-    private InstanceInfo info;
+    private String host;
+    private int port;
 
-    private transient long lastRenewStamp;
+    private transient Timestamp lastRenewStamp;
     private AtomicInteger connectingInt; // 正在连接数
     private AtomicInteger historyInt; // 历史连接数
     private AtomicDouble avgAccess; // 平均响应时间
 
-    public ServiceProvider() { }
+    public ServiceProvider() {
+        lastRenewStamp = new Timestamp(new Date().getTime());
+    }
 
     public ServiceProvider(String appName, String host, int port) {
         mask = UUID.randomUUID().toString();
         this.appName = appName;
-        info = new InstanceInfo(host, port);
         connectingInt = new AtomicInteger(0);
         historyInt = new AtomicInteger(0);
         avgAccess = new AtomicDouble(0.0);
@@ -37,32 +43,40 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         return appName;
     }
 
-    public InstanceInfo getInfo() {
-        return info;
+    public String getHost() {
+        return host;
+    }
+
+    public int port() {
+        return port;
     }
 
     /**
      * 只在renew的函数中发生
      * */
     public void newVersion() {
-        this.info = new InstanceInfo(info.host(), info.port());
+        lastRenewStamp = new Timestamp(new Date().getTime());
     }
 
     /*版本比较器*/
     @Override
     public int compareTo(ServiceProvider o) {
-        return this.info.compareTo(o.info);
+        return lastRenewStamp.compareTo(o.lastRenewStamp);
     }
 
     @Override
-    public boolean cover(ServiceProvider s) {
-        if (s == null) return false;
-        if (!mask.equals(s.mask)) return false;
-        if (!appName.equals(s.appName)) return false;
-        if (!info.cover(s.info)) return false;
-        connectingInt.set(s.connectingInt.get());
-        historyInt.set(s.historyInt.get());
-        avgAccess.set(s.avgAccess.doubleValue());
+    public boolean cover(ServiceProvider newCover) {
+        if (newCover == null)
+            return false;
+        if (lastRenewStamp.after(newCover.lastRenewStamp))
+            return false;
+        if (!mask.equals(newCover.mask))
+            return false;
+        if (!appName.equals(newCover.appName))
+            return false;
+        connectingInt.set(newCover.connectingInt.get());
+        historyInt.set(newCover.historyInt.get());
+        avgAccess.set(newCover.avgAccess.doubleValue());
         return true;
     }
 
@@ -113,7 +127,7 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
 
     @Override
     public int hashCode() {
-        return Objects.hash(info);
+        return Objects.hash(appName, mask);
     }
 
     /*public int mask() {
@@ -135,10 +149,16 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         ServiceProvider cSP = (ServiceProvider)super.clone();
         cSP.mask = mask;
         cSP.appName = appName;
-        cSP.info = (InstanceInfo) super.clone();
+        cSP.lastRenewStamp = lastRenewStamp;
         cSP.avgAccess = new AtomicDouble(avgAccess.doubleValue());
         cSP.connectingInt = new AtomicInteger(connectingInt.get());
         cSP.historyInt = new AtomicInteger(historyInt.get());
         return cSP;
+    }
+
+    @SneakyThrows
+    @Override
+    public String toString() {
+        return JSONUtil.writeValue(this);
     }
 }

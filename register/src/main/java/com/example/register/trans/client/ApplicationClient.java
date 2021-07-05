@@ -46,8 +46,8 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
     protected void init(Application application, ServiceProvidersBootConfig config) throws Exception {
         if (this.isAlive()) return;
 
-        if (application instanceof RegistryClient) {
-            app = (RegistryClient) application;
+        if (application instanceof DiscoveryNodeProcess) {
+            app = (DiscoveryNodeProcess) application;
         } else {
             throw new Exception("Client application thread init error.");
         }
@@ -83,9 +83,8 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
     @Override
     public void stopThread() {
 //        runner.interrupt();
-        if (!this.isAlive()) return;
+        super.stopThread();
 
-        this.interrupt();
         if (!clientNetWorkLoop.isTerminated()) {
             clientNetWorkLoop.shutdownGracefully();
         }
@@ -136,7 +135,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
                         }
                     }
                     if (lastRenewStamp - System.currentTimeMillis() >= heartBeatIntervals) {
-                        client.renew(false); // 心跳
+                        client.renew(client.getMyself(), false, false, false); // 心跳
                     }
                 } catch (Exception e) {
                     // thread interrupt, and while break out

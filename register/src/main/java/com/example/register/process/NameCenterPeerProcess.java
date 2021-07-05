@@ -101,7 +101,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
             sb.append(app).append(",");
         }
         sb.deleteCharAt(sb.length() - 1);
-        discover(myPeer, sb.toString(), sync);
+        discover(sb.toString(), sync);
     }
 
     @Override
@@ -112,5 +112,10 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
          * if one peer is inactive, remove from table
          * */
         return false;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return client.isAlive() && server.isAlive();
     }
 }

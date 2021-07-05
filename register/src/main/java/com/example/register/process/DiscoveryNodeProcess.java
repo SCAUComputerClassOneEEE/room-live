@@ -14,10 +14,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 
 /**
@@ -71,8 +68,6 @@ import java.util.Set;
 public class DiscoveryNodeProcess implements RegistryClient{
     protected static ServiceApplicationsTable table;
     protected ApplicationClient client;
-    protected volatile ServiceProvider myPeer; /*向他发送心跳 hb/30s*/
-    protected Set<ServiceProvider> otherPeers;
     protected ServiceProvider mySelf;
 
     public DiscoveryNodeProcess(ServiceProvidersBootConfig config) throws Exception {
@@ -91,7 +86,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
         /*
         * register myself
         * */
-        register();
+        register(config.getSelfNode(), false, false);
     }
 
     @Override
@@ -101,9 +96,14 @@ public class DiscoveryNodeProcess implements RegistryClient{
 
     @Override
     public void stop() throws Exception {
-        offline();
+        offline(mySelf, false, false);
+        client.stopThread();
     }
 
+    @Override
+    public boolean isRunning() {
+        return client.isAlive();
+    }
 
     /**
      * 阻塞
@@ -113,22 +113,30 @@ public class DiscoveryNodeProcess implements RegistryClient{
      * table删除该peer，重新调用register
      *
      * 最后修改myPeer, otherPeers
+     *
+     * setup callByPeer secondPeer
+     *     1          f          f // node 出发
+     *     2          t          f // peer 出发
+     *     3          t          t // 结束广播
      * */
     @Override
-    public final void register() throws Exception {
-        if (myPeer == null) {
-            Object[] servers = table.getAppsAsSet(ServiceApplicationsTable.SERVER_PEER_NODE).toArray();
-            if (servers.length <= 0)
-                throw new RuntimeException("server num is zero...no server is running now");
-            myPeer = (ServiceProvider) servers[0];
+    public final void register(ServiceProvider who, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception {
+        if (who == null) {
+            who = mySelf;
         }
-        replicate(myPeer, mySelf, ReplicationAction.REGISTER, true, false);
+        table.putAppIfAbsent(who.getAppName(), who);
+        if (!secondPeer)
+            replicate(who, ReplicationAction.REGISTER, true, callByPeer);
     }
 
     @Override
-    public void offline() throws Exception {
-        replicate(myPeer, mySelf, ReplicationAction.OFFLINE, true, false);
-        client.stopThread();
+    public final void offline(ServiceProvider who, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception {
+        if (who == null) {
+            who = mySelf;
+        }
+        table.removeApp(who);
+        if (!secondPeer)
+            replicate(who, ReplicationAction.OFFLINE, true, callByPeer);
     }
 
     /**
@@ -139,35 +147,45 @@ public class DiscoveryNodeProcess implements RegistryClient{
      * 收到500，调用register到otherPeers，table删除该peer
      * */
     @Override
-    public final void renew(boolean sync) throws Exception {
-        replicate(myPeer, mySelf, ReplicationAction.RENEW, sync, false);
+    public final void renew(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播， 第三次调用*/) throws Exception {
+        if (who == null) {
+            who = mySelf;
+        }
+        table.renewApp(who);
+        if (!secondPeer)
+            replicate(who, ReplicationAction.RENEW, sync, callByPeer);
     }
 
     @Override
-    public final void discover(ServiceProvider peer, String appNames, boolean sync) throws Exception {
+    public final void discover(String appNames, boolean sync) throws Exception {
+        ServiceProvider peer = table.getOptimalServer();
         HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                 .byClient(client)
-                .access(HttpMethod.GET, "/discover?appNames=" + appNames)
+                .access(HttpMethod.GET, "/discover")
                 .connectWith(peer)
+                .addHeader("Content-Type", "text/plain")
+                .addHeader("content-length", appNames.length())
                 .done(new ProcessedRunnable() {
                     @Override
                     public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
                         if (status.equals(HttpResponseStatus.CREATED)) {
                             // --> 200 请求成功，对方返回的数据是可解析的
                             Map<String, Set<ServiceProvider>> serviceProviders = JSONUtil.readMapSetValue(resultString);
-                            table.compareAndReturnUpdate(serviceProviders);
+                            Map<String, Set<ServiceProvider>> newerSet = table.compareAndReturnUpdate(serviceProviders);
+                            // replicate newerSet
+                            List<String> newAppNames = new LinkedList<>();
+                            newerSet.forEach((s, serviceProviders1) -> newAppNames.add(s));
+                            antiReplicate(peer, newAppNames, false);
                         } else if (status.equals(HttpResponseStatus.SEE_OTHER)) {
                             // --> 303 不存在该类数据（对于discover该资源还没有注册，或者已经下线），对方希望请求别的peer
                             /*
                              *选择最优的 server
                              */
-                            ServiceProvider optimal = table.getOptimal(ServiceApplicationsTable.SERVER_PEER_NODE);
-                            discover(optimal, appNames, sync);
+                            discover(appNames, sync);
                         } else {
                             // --> 500 服务器异常，重新register到别的peer，再进行discover
-                            table.removeApp(peer);
-                            register();
-                            discover(peer, appNames, sync);
+                            offline(peer, false, false);
+                            discover(appNames, sync);
                         }
                     }
 
@@ -175,7 +193,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
                     public void failAndThen(ResultType errorType, String resultString) throws Exception {
                         table.removeApp(peer);
                     }
-                }).create();
+                }).withBody(appNames).create();
         /*block to sub taskQueue*/
         executor.sub();
         if (sync) {
@@ -185,31 +203,77 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public void replicate(ServiceProvider goalPeerNode, ServiceProvider carryNode, ReplicationAction action, boolean sync, boolean comeFromPeer) throws Exception {
-        String url = action.getAction();
-        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
-                .byClient(client)
-                .access(HttpMethod.POST, url)
-                .connectWith(myPeer)
-                .done(new ProcessedRunnable() {
-                    @Override
-                    public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
+    public final void replicate(ServiceProvider carryNode,
+                          ReplicationAction action,
+                          boolean sync, boolean callByPeer) throws Exception {
+        String body = carryNode.toString();
+        List<HttpTaskCarrierExecutor> executors = new LinkedList<>();
+        List<ServiceProvider> myPeerTemp = new LinkedList<>();
+        myPeerTemp.add(table.getOptimalServer());
+        /*
+        * if the replication call by a peer, // comeFromPeer = true
+        * it need broadcast this action;
+        * else just to myPeer. // comeFromPeer = false
+        * */
+        Iterator<ServiceProvider> servers = callByPeer
+                ? table.getServers() : myPeerTemp.iterator();
+        while (servers.hasNext()) {
+            ServiceProvider myConPeer = servers.next();
+            String url = action.getAction();
+            HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
+                    .byClient(client)
+                    .access(HttpMethod.POST, "/" + url)
+                    .connectWith(myConPeer)
+                    .addHeader("REPLICATION", callByPeer ? "PEER" : "NODE")
+                    .addHeader("Content-Type", "text/plain")
+                    .addHeader("content-length", body.length())
+                    .done(new ProcessedRunnable() {
+                        @Override
+                        public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
 
-                    }
-
-                    @Override
-                    public void failAndThen(ResultType errorType, String resultString) throws Exception {
-                        if (!action.equals(ReplicationAction.OFFLINE)) {
-                            table.removeApp(myPeer);
-                            myPeer = null;
-                            register();
                         }
-                    }
-                }).create();
-        /*block to sub taskQueue*/
-        executor.sub();
+                        @Override
+                        public void failAndThen(ResultType errorType, String resultString) throws Exception {
+                            offline(carryNode, callByPeer, false);
+                        }
+                    }).withBody(body).create();
+            /*block to sub taskQueue*/
+            executor.sub();
+            executors.add(executor);
+            servers.remove();
+        }
         /*wait until executor's doneRunnable end*/
         if (sync)
+            for (HttpTaskCarrierExecutor executor : executors) {
+                executor.sync();
+            }
+    }
+
+    @Override
+    public final void antiReplicate(ServiceProvider toWho, List<String> apps, boolean sync) throws Exception {
+        HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
+                .byClient(client)
+                .access(HttpMethod.POST, "/antiReplicate")
+                .connectWith(toWho)
+                .done(new ProcessedRunnable() {
+                    @Override
+                    public void failAndThen(ResultType errorType, String resultString) throws Exception {
+                        offline(toWho, false, false);
+                    }
+                }).withBody(JSONUtil.writeValue(apps)).create();
+        /*block to sub taskQueue*/
+        executor.sub();
+        if (sync)
             executor.sync();
+    }
+
+    @Override
+    public Set<ServiceProvider> find(String appName) {
+        return table.getAppsAsSet(appName);
+    }
+
+    @Override
+    public ServiceProvider getMyself() {
+        return mySelf;
     }
 }

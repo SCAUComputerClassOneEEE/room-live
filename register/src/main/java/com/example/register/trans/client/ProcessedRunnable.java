@@ -23,7 +23,7 @@ public abstract class ProcessedRunnable implements Runnable {
             try {
                 failAndThen(process.getErrorType(), process.getResultString());
             } catch (Exception e) {
-                System.out.println("i don't know what happened, maybe json parsing.");
+                process.getClient().stopThread();
                 e.printStackTrace();
             }
         }

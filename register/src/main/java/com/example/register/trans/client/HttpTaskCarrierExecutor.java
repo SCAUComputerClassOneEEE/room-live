@@ -8,6 +8,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.*;
+import io.netty.util.CharsetUtil;
 import io.netty.util.internal.ObjectUtil;
 
 import java.nio.charset.StandardCharsets;
@@ -28,11 +29,26 @@ public class HttpTaskCarrierExecutor {
     private ServiceProvider provider; // where
     private FullHttpRequest httpRequest; // for what
     private volatile TaskExecuteResult result;
-    private String taskId;
+    private final String taskId;
     private ProcessedRunnable doneTodo;
     private ApplicationClient client; // 发送http
 
-    private HttpTaskCarrierExecutor() {}
+    private HttpTaskCarrierExecutor() {
+        taskId = UUID.randomUUID().toString();
+    }
+
+    public HttpTaskCarrierExecutor(HttpTaskCarrierExecutor copy, ServiceProvider conProvider) {
+        taskId = UUID.randomUUID().toString();
+        provider = conProvider;
+        httpRequest = copy.httpRequest;
+        doneTodo = copy.doneTodo;
+        doneTodo.setExecutor(this);
+        client = copy.client;
+    }
+
+    public ApplicationClient getClient() {
+        return client;
+    }
 
     public static class Builder {
         private ServiceProvider builderProvider;
@@ -101,7 +117,6 @@ public class HttpTaskCarrierExecutor {
             target.client = builderClient;
             target.provider = builderProvider;
             target.httpRequest = builderRequest;
-            target.taskId = UUID.randomUUID().toString();
             builderHeaders.add("taskId", target.taskId);
             String accept = builderHeaders.get("Accept");
             if (accept == null || accept.equals("")) {
@@ -152,9 +167,8 @@ public class HttpTaskCarrierExecutor {
             if (!success())
                 throw getCause();
             ByteBuf content = result.content();
-            byte[] array = content.array();
             release();
-            return new String(array);
+            return content.toString(CharsetUtil.UTF_8);
         }
     }
 
@@ -193,12 +207,12 @@ public class HttpTaskCarrierExecutor {
     protected void connectAndSend() {
         try {
             // connect
-            ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getInfo().host(), provider.getInfo().port()).await();
+            ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getHost(), provider.port()).await();
             if (!sync.isSuccess()) {
                 /*
                 connect time out
                 */
-                fail(ResultType.CONNECT_TIME_OUT, new Exception("connect time out with" + provider.getInfo()));
+                fail(ResultType.CONNECT_TIME_OUT, new Exception("connect time out with" + provider.toString()));
                 return;
             }
             /*

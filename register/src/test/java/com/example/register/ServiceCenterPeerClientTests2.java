@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 public class ServiceCenterPeerClientTests2 {
     public static void main(String[] args) throws IOException, InterruptedException {
         ServerBootstrap bootstrap = new ServerBootstrap();
-        bootstrap
+        ChannelFuture sync = bootstrap
                 .group(new NioEventLoopGroup(), new NioEventLoopGroup())
                 .localAddress(8080)
                 .channel(NioServerSocketChannel.class)
@@ -28,12 +28,15 @@ public class ServiceCenterPeerClientTests2 {
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline()
-                                .addLast(new WriteTimeoutHandler(1, TimeUnit.MILLISECONDS))
+                                .addLast(new WriteTimeoutHandler(3000, TimeUnit.MILLISECONDS)) // 返回408
                                 .addLast(new HttpServerCodec())
                                 .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
-                                .addLast(new Server());
+                                .addLast(new HttpServerHandler(null));
                     }
                 }).bind().sync();
+        if (sync.isSuccess()) {
+            System.out.println("...");
+        }
     }
 
 

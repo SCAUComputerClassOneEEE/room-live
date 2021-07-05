@@ -107,11 +107,12 @@ public class ServiceApplicationsTable {
         return getMapList;
     }
 
-    /**
-     * @return servers for notifying
-     */
-    public Iterator<ServiceProvider> getServers() {
-        return getAppsAsIterator(SERVER_PEER_NODE);
+    public boolean hasAnyApps(String appName) {
+        return doubleMarkMap.get(appName).size() > 0;
+    }
+
+    public ServiceProvider getOptimalServer() {
+        return getOptimal(SERVER_PEER_NODE);
     }
 
     /**
@@ -119,9 +120,15 @@ public class ServiceApplicationsTable {
      * 选择最优的serviceProvider
      */
     public ServiceProvider getOptimal(String appName) {
+        if (!hasAnyApps(appName))
+            return null;
         Set<ServiceProvider> appsAsSet = getAppsAsSet(appName);
 
         return null;
+    }
+
+    public Iterator<ServiceProvider> getServers() {
+        return getAppsAsIterator(SERVER_PEER_NODE);
     }
 
     /**
@@ -152,24 +159,23 @@ public class ServiceApplicationsTable {
 
     public ServiceProvider getApp(String appName, String mask) {
         ServiceProvider rSP;
-        if (appName == null || appName.equals("")) {
-            if (mask == null || mask.equals(""))
-                return null;
-            Collection<ConcurrentHashMap<String, ServiceProvider>> values = doubleMarkMap.values();
-
-            List<Map.Entry<String, ConcurrentHashMap<String, ServiceProvider>>> all = new LinkedList<>(doubleMarkMap.entrySet());
-            for (Map.Entry<String, ConcurrentHashMap<String, ServiceProvider>> e : all) {
-                ServiceProvider serviceProvider = e.getValue().get(mask);
-                if (serviceProvider != null)
-                    return serviceProvider;
-            }
-        }
+        if (appName == null || appName.equals(""))
+            return null;
         if (mask == null || mask.equals(""))
             return null;
         Map<String, ServiceProvider> appSet = doubleMarkMap.get(appName);
         rSP = appSet.get(mask);
         return rSP;
     }
+
+    public void renewApp(ServiceProvider value) {
+        ServiceProvider app = getApp(value.getAppName(), value.getMask());
+        if (app == null)
+            return;
+        app.newVersion();
+        app.cover(value);
+    }
+
 
     /**
      * 与自身的比较并更新，并且返回返回版本更加高的，自身有而second没有的

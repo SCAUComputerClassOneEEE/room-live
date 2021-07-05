@@ -59,7 +59,11 @@ public class ServiceProvidersBootConfig {
         this.taskQueueMaxSize = taskQueueMaxSize;
     }
 
-    public RegistryServer.ClusterType getServerClusterType() { return serverClusterType; }
+    public RegistryServer.ClusterType getServerClusterType() {
+        if (serverClusterType == null)
+            return RegistryServer.ClusterType.SINGLE;
+        return serverClusterType;
+    }
 
     public void setServerClusterType(RegistryServer.ClusterType serverClusterType) {
         this.serverClusterType = serverClusterType;
