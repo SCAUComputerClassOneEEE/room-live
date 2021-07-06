@@ -101,7 +101,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
             sb.append(app).append(",");
         }
         sb.deleteCharAt(sb.length() - 1);
-        discover(sb.toString(), sync);
+        discover(null, sb.toString(), sync);
     }
 
     @Override

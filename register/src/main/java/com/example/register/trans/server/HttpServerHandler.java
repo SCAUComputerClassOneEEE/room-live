@@ -4,17 +4,24 @@ import com.example.register.process.NameCenterPeerProcess;
 import com.example.register.process.RegistryClient;
 import com.example.register.process.RegistryServer;
 import com.example.register.serviceInfo.ServiceProvider;
+import com.example.register.trans.client.ResultType;
 import com.example.register.utils.JSONUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.timeout.ReadTimeoutException;
+import io.netty.handler.timeout.WriteTimeoutException;
 import io.netty.util.CharsetUtil;
 import io.netty.util.internal.StringUtil;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.HashMap;
@@ -44,7 +51,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             if (request.method().name().equals("GET")) {
                 getMethod(cxt, request);
             }
-            else if ("POST".equals(request.method().name())) {
+            else if (request.method().name().equals("POST")) {
                 postMethod(cxt, request);
             } else {
                 response(cxt, HttpResponseStatus.BAD_REQUEST, "error http method!");
@@ -58,9 +65,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     private void getMethod(ChannelHandlerContext cxt, FullHttpRequest request) throws Exception {
         String uri = request.uri();
-        String replication = request.headers().get("REPLICATION");
-        if (StringUtil.isNullOrEmpty(replication) || StringUtil.isNullOrEmpty(uri)){
-            throw new RuntimeException("replication header is empty or uri is null.");
+        if (StringUtil.isNullOrEmpty(uri)){
+            throw new RuntimeException("uri is null.");
         }
         if (!uri.equals("/discover")) {
             throw new RuntimeException("uri is invalid.");
@@ -83,6 +89,32 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         * 如果请求头里有PEER_REPLICATION，不再调用replicate
         * callByPeer = true, secondPeer = true
         * */
+        String replication = request.headers().get("REPLICATION");
+        if (StringUtil.isNullOrEmpty(replication)) {
+            throw new RuntimeException("replication header is empty");
+        }
+        boolean secondPeer = replication.equals("PEER");
+        InetSocketAddress address = (InetSocketAddress)(cxt.channel().remoteAddress());
+        String uri = request.uri();
+        String content = request.content().toString(CharsetUtil.UTF_8);
+        ServiceProvider serviceProvider = null;
+        if (!uri.equals("/antiReplication")) {
+            serviceProvider = JSONUtil.readValue(content, ServiceProvider.class);
+        }
+        switch (uri) {
+            case "/register" :      app.register(serviceProvider, false, true, secondPeer);
+                                    break;
+            case "/renew" :         app.renew(serviceProvider, false, true, secondPeer);
+                                    break;
+            case "/offline" :       app.offline(serviceProvider, false, true, secondPeer);
+                                    break;
+            case "/antiReplicate" : app.discover(
+                                        new ServiceProvider("", address.getHostName(), address.getPort()),
+                                        content, false);
+                                    break;
+            default:throw new RuntimeException("uri is invalid.");
+        }
+        response(cxt, HttpResponseStatus.OK, "");
     }
 
     private void response(ChannelHandlerContext cxt, HttpResponseStatus status, String c) {
@@ -94,12 +126,13 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        super.userEventTriggered(ctx, evt);
-    }
-
-    @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        response(ctx, HttpResponseStatus.INTERNAL_SERVER_ERROR, cause.toString());
+        HttpResponseStatus error;
+        if (cause instanceof WriteTimeoutException) {
+            error = HttpResponseStatus.NO_CONTENT;
+        } else {
+            error = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+        }
+        response(ctx, error, cause.toString());
     }
 }

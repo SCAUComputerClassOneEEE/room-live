@@ -4,6 +4,8 @@ import com.example.register.utils.CollectionUtil;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * map appName --> ServiceProvider
@@ -12,6 +14,26 @@ public class ServiceApplicationsTable {
 
     public static final String SERVER_PEER_NODE = "server-peer-node-service";
     public static final String DEFAULT_CLIENT_APPLICATION = "default_client-application";
+
+    /*
+     * LB
+     */
+    public static class LeastConnectionComparator implements Comparator<ServiceProvider> {
+        @Override
+        public int compare(ServiceProvider o1, ServiceProvider o2) {
+            return o1.getConnectingInt().get() > o2.getConnectingInt().get() ? 0 : 1;
+        }
+    }
+
+    /*
+    * 降序
+    * */
+    public static class FastestResponseComparator implements Comparator<ServiceProvider> {
+        @Override
+        public int compare(ServiceProvider o1, ServiceProvider o2) {
+            return o1.getAvgAccess().get() > o2.getAvgAccess().get() ? 0 : 1;
+        }
+    }
 
     /*
     *
@@ -120,11 +142,11 @@ public class ServiceApplicationsTable {
      * 选择最优的serviceProvider
      */
     public ServiceProvider getOptimal(String appName) {
-        if (!hasAnyApps(appName))
-            return null;
         Set<ServiceProvider> appsAsSet = getAppsAsSet(appName);
-
-        return null;
+        if (appsAsSet.size() == 0)
+            return null;
+        Object[] objects = appsAsSet.stream().sorted(new FastestResponseComparator()).distinct().toArray();
+        return ((ServiceProvider[]) objects)[0];
     }
 
     public Iterator<ServiceProvider> getServers() {
@@ -140,11 +162,12 @@ public class ServiceApplicationsTable {
     }
 
     public Set<ServiceProvider> getAppsAsSet(String appName) {
+        Set<ServiceProvider> set = new HashSet<>();
         final Map<String, ServiceProvider> appSet = doubleMarkMap.get(appName);
-        Set<ServiceProvider> list = new HashSet<>();
-        if (appSet == null) return list;
-        appSet.forEach((s, serviceProvider) -> list.add(serviceProvider));
-        return list;
+        if (appSet == null || appSet.size() <= 0)
+            return set;
+        appSet.forEach((s, serviceProvider) -> set.add(serviceProvider));
+        return set;
     }
 
     public Set<ServiceProvider> getAppsAsClonedSet(String appName) throws CloneNotSupportedException {

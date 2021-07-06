@@ -86,7 +86,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
         /*
         * register myself
         * */
-        register(config.getSelfNode(), false, false);
+        register(config.getSelfNode(),true, false, false);
     }
 
     @Override
@@ -96,7 +96,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
 
     @Override
     public void stop() throws Exception {
-        offline(mySelf, false, false);
+        offline(mySelf,true, false, false);
         client.stopThread();
     }
 
@@ -120,23 +120,23 @@ public class DiscoveryNodeProcess implements RegistryClient{
      *     3          t          t // 结束广播
      * */
     @Override
-    public final void register(ServiceProvider who, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception {
+    public final void register(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception {
         if (who == null) {
             who = mySelf;
         }
         table.putAppIfAbsent(who.getAppName(), who);
         if (!secondPeer)
-            replicate(who, ReplicationAction.REGISTER, true, callByPeer);
+            replicate(who, ReplicationAction.REGISTER, sync, callByPeer);
     }
 
     @Override
-    public final void offline(ServiceProvider who, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception {
+    public final void offline(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception {
         if (who == null) {
             who = mySelf;
         }
         table.removeApp(who);
         if (!secondPeer)
-            replicate(who, ReplicationAction.OFFLINE, true, callByPeer);
+            replicate(who, ReplicationAction.OFFLINE, sync, callByPeer);
     }
 
     /**
@@ -157,8 +157,11 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public final void discover(String appNames, boolean sync) throws Exception {
-        ServiceProvider peer = table.getOptimalServer();
+    public final void discover(ServiceProvider peer, String appNames, boolean sync) throws Exception {
+        if (peer == null) {
+            peer = table.getOptimalServer();
+        }
+        final ServiceProvider _peer = peer;
         HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                 .byClient(client)
                 .access(HttpMethod.GET, "/discover")
@@ -173,25 +176,26 @@ public class DiscoveryNodeProcess implements RegistryClient{
                             Map<String, Set<ServiceProvider>> serviceProviders = JSONUtil.readMapSetValue(resultString);
                             Map<String, Set<ServiceProvider>> newerSet = table.compareAndReturnUpdate(serviceProviders);
                             // replicate newerSet
-                            List<String> newAppNames = new LinkedList<>();
-                            newerSet.forEach((s, serviceProviders1) -> newAppNames.add(s));
-                            antiReplicate(peer, newAppNames, false);
+                            StringBuilder newAppNames = new StringBuilder();
+                            newerSet.forEach((s, serviceProviders1) -> newAppNames.append("s"));
+                            newAppNames.deleteCharAt(newAppNames.length() - 1);
+                            antiReplicate(_peer, newAppNames.toString(), false);
                         } else if (status.equals(HttpResponseStatus.SEE_OTHER)) {
                             // --> 303 不存在该类数据（对于discover该资源还没有注册，或者已经下线），对方希望请求别的peer
                             /*
                              *选择最优的 server
                              */
-                            discover(appNames, sync);
+                            discover(null, appNames, sync);
                         } else {
                             // --> 500 服务器异常，重新register到别的peer，再进行discover
-                            offline(peer, false, false);
-                            discover(appNames, sync);
+                            offline(_peer, false, false, false);
+                            discover(null, appNames, sync);
                         }
                     }
 
                     @Override
                     public void failAndThen(ResultType errorType, String resultString) throws Exception {
-                        table.removeApp(peer);
+                        table.removeApp(_peer);
                     }
                 }).withBody(appNames).create();
         /*block to sub taskQueue*/
@@ -234,7 +238,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
                         }
                         @Override
                         public void failAndThen(ResultType errorType, String resultString) throws Exception {
-                            offline(carryNode, callByPeer, false);
+                            offline(carryNode, false, callByPeer, false);
                         }
                     }).withBody(body).create();
             /*block to sub taskQueue*/
@@ -250,7 +254,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public final void antiReplicate(ServiceProvider toWho, List<String> apps, boolean sync) throws Exception {
+    public final void antiReplicate(ServiceProvider toWho, String appNames, boolean sync) throws Exception {
         HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                 .byClient(client)
                 .access(HttpMethod.POST, "/antiReplicate")
@@ -258,9 +262,9 @@ public class DiscoveryNodeProcess implements RegistryClient{
                 .done(new ProcessedRunnable() {
                     @Override
                     public void failAndThen(ResultType errorType, String resultString) throws Exception {
-                        offline(toWho, false, false);
+                        offline(toWho, false, false, false);
                     }
-                }).withBody(JSONUtil.writeValue(apps)).create();
+                }).withBody(appNames).create();
         /*block to sub taskQueue*/
         executor.sub();
         if (sync)

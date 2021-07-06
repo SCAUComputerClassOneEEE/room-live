@@ -51,6 +51,10 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         return port;
     }
 
+    public AtomicInteger getConnectingInt() { return connectingInt; }
+
+    public AtomicDouble getAvgAccess() { return avgAccess; }
+
     /**
      * 只在renew的函数中发生
      * */
@@ -80,30 +84,14 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         return true;
     }
 
-    /*
-     *
-     * LB
-     */
-    public static class LeastConnectionComparator implements Comparator<ServiceProvider> {
-        @Override
-        public int compare(ServiceProvider o1, ServiceProvider o2) {
-            return o1.connectingInt.get() > o2.connectingInt.get() ? 0 : 1;
-        }
-    }
-
-    public static class FastestResponseComparator implements Comparator<ServiceProvider> {
-        @Override
-        public int compare(ServiceProvider o1, ServiceProvider o2) {
-            return o1.avgAccess.get() > o2.avgAccess.get() ? 0 : 1;
-        }
-    }
-
-    public int incrementConnectingInt() {
+    public void incrementConnectingInt() {
         historyInt.incrementAndGet();
-        return connectingInt.incrementAndGet();
+        connectingInt.incrementAndGet();
     }
 
-    public int decrementConnectingInt() { return connectingInt.decrementAndGet(); }
+    public void decrementConnectingInt() {
+        connectingInt.decrementAndGet();
+    }
 
     public double fixAccessAvg(double newAccess) {
         final int nowHistoryInt = historyInt.get();

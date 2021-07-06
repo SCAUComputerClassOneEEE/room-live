@@ -32,6 +32,8 @@ public class HttpTaskCarrierExecutor {
     private final String taskId;
     private ProcessedRunnable doneTodo;
     private ApplicationClient client; // 发送http
+    private long startExec;
+    private long endExec;
 
     private HttpTaskCarrierExecutor() {
         taskId = UUID.randomUUID().toString();
@@ -195,11 +197,17 @@ public class HttpTaskCarrierExecutor {
     *                        channel inactive --> SUCCESS           --> syncSuccess
     * */
     protected void success(FullHttpResponse result) {
+        endExec = System.currentTimeMillis();
+        provider.fixAccessAvg(endExec - startExec);
+        provider.decrementConnectingInt();
         setResult(result);
         HttpTaskExecutorPool.getInstance().submit(this.doneTodo);
     }
 
     protected void fail(ResultType type, Throwable cause) {
+        endExec = System.currentTimeMillis();
+        provider.fixAccessAvg(endExec - startExec);
+        provider.decrementConnectingInt();
         setResult(type, cause);
         HttpTaskExecutorPool.getInstance().submit(this.doneTodo);
     }
@@ -220,6 +228,8 @@ public class HttpTaskCarrierExecutor {
              * send...
              */
             ChannelFuture send = sync.channel().writeAndFlush(httpRequest);
+            startExec = System.currentTimeMillis();
+            provider.incrementConnectingInt();
             send.addListener((ChannelFutureListener) channelFuture -> HttpTaskExecutorPool.taskMap.put(taskId, this));
         } catch (Exception e) {
             fail(ResultType.RUNTIME_EXCEPTION, e);

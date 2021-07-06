@@ -24,20 +24,21 @@ public interface RegistryClient extends Application, MethodNestable {
         }
     }
 
-    void register(ServiceProvider who, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception;
+    void register(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception;
 
     void renew(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer) throws Exception;
 
+    void offline(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception;
     // get
-    void discover(String appName, boolean sync) throws Exception;
+    void discover(ServiceProvider peer, String appName, boolean sync) throws Exception;
 
     void replicate(ServiceProvider carryNode, ReplicationAction action, boolean sync, boolean comeFromPeer) throws Exception;
 
-    void offline(ServiceProvider who, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception;
+
 
     ServiceProvider getMyself();
 
-    void antiReplicate(ServiceProvider toWho, List<String> apps, boolean sync) throws JsonProcessingException, Exception;
+    void antiReplicate(ServiceProvider toWho, String appNames, boolean sync) throws Exception;
 
     Set<ServiceProvider> find(String appName);
 }
