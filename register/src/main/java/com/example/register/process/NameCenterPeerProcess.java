@@ -13,6 +13,8 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 
 import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  *
@@ -36,6 +38,7 @@ import java.util.*;
 public class NameCenterPeerProcess extends DiscoveryNodeProcess implements RegistryServer {
 
     private ApplicationServer server;
+    private int heartBeatIntervals;
 
     // 基础通信：client 和 server
 
@@ -69,6 +72,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
         * start server
         * */
         server = new ApplicationServer(this, config);
+        heartBeatIntervals = config.getHeartBeatIntervals();
     }
 
     /**
@@ -112,6 +116,19 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
          * if one peer is inactive, remove from table
          * */
         return false;
+    }
+
+    @Override
+    public Map<String, Set<ServiceProvider>> scan() {
+        Map<String, Set<ServiceProvider>> allAsMapSet = table.getAllAsMapSet();
+        Map<String, Set<ServiceProvider>> noHeartBeat = new HashMap<>();
+        allAsMapSet.forEach((appName, set)->{
+            Set<ServiceProvider> collect = set.stream()
+                    .sorted().filter(serviceProvider -> serviceProvider.heartBeatGap() > heartBeatIntervals)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            noHeartBeat.put(appName, collect);
+        });
+        return noHeartBeat;
     }
 
     @Override

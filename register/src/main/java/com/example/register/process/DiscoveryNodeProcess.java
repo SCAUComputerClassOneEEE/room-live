@@ -13,6 +13,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -66,6 +68,9 @@ import java.util.*;
  * --> 500 服务器异常，重新register到别的peer
  * */
 public class DiscoveryNodeProcess implements RegistryClient{
+
+    private static final Logger logger = LoggerFactory.getLogger(DiscoveryNodeProcess.class);
+
     protected static ServiceApplicationsTable table;
     protected ApplicationClient client;
     protected ServiceProvider mySelf;
@@ -120,23 +125,33 @@ public class DiscoveryNodeProcess implements RegistryClient{
      *     3          t          t // 结束广播
      * */
     @Override
-    public final void register(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception {
+    public final void register(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) {
         if (who == null) {
             who = mySelf;
         }
+        logger.debug("try to register " + who.toString());
         table.putAppIfAbsent(who.getAppName(), who);
-        if (!secondPeer)
-            replicate(who, ReplicationAction.REGISTER, sync, callByPeer);
+        try {
+            if (!secondPeer)
+                replicate(who, ReplicationAction.REGISTER, sync, callByPeer);
+        } catch (Exception e) {
+            logger.error("when register " + e.getMessage());
+        }
     }
 
     @Override
-    public final void offline(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception {
+    public final void offline(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) {
         if (who == null) {
             who = mySelf;
         }
+        logger.debug("try to offline " + who.toString());
         table.removeApp(who);
-        if (!secondPeer)
-            replicate(who, ReplicationAction.OFFLINE, sync, callByPeer);
+        try {
+            if (!secondPeer)
+                replicate(who, ReplicationAction.OFFLINE, sync, callByPeer);
+        } catch (Exception e) {
+            logger.error("when offline " + e.getMessage());
+        }
     }
 
     /**
@@ -147,13 +162,18 @@ public class DiscoveryNodeProcess implements RegistryClient{
      * 收到500，调用register到otherPeers，table删除该peer
      * */
     @Override
-    public final void renew(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播， 第三次调用*/) throws Exception {
+    public final void renew(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播， 第三次调用*/) {
         if (who == null) {
             who = mySelf;
         }
+        logger.debug("try to renew " + who.toString());
         table.renewApp(who);
-        if (!secondPeer)
-            replicate(who, ReplicationAction.RENEW, sync, callByPeer);
+        try {
+            if (!secondPeer)
+                replicate(who, ReplicationAction.RENEW, sync, callByPeer);
+        } catch (Exception e) {
+            logger.error("when renew " + e.getMessage());
+        }
     }
 
     @Override
@@ -194,7 +214,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
                     }
 
                     @Override
-                    public void failAndThen(ResultType errorType, String resultString) throws Exception {
+                    public void failAndThen(ResultType errorType, String resultString) {
                         table.removeApp(_peer);
                     }
                 }).withBody(appNames).create();
@@ -237,7 +257,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
 
                         }
                         @Override
-                        public void failAndThen(ResultType errorType, String resultString) throws Exception {
+                        public void failAndThen(ResultType errorType, String resultString) {
                             offline(carryNode, false, callByPeer, false);
                         }
                     }).withBody(body).create();
@@ -261,7 +281,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
                 .connectWith(toWho)
                 .done(new ProcessedRunnable() {
                     @Override
-                    public void failAndThen(ResultType errorType, String resultString) throws Exception {
+                    public void failAndThen(ResultType errorType, String resultString) {
                         offline(toWho, false, false, false);
                     }
                 }).withBody(appNames).create();

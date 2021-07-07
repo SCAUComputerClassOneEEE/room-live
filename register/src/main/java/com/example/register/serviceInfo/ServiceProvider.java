@@ -62,6 +62,10 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         lastRenewStamp = new Timestamp(new Date().getTime());
     }
 
+    public long heartBeatGap() {
+        return System.currentTimeMillis() - lastRenewStamp.getTime();
+    }
+
     /*版本比较器*/
     @Override
     public int compareTo(ServiceProvider o) {

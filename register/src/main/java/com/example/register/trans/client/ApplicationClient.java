@@ -14,6 +14,8 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -27,6 +29,8 @@ import java.util.concurrent.TimeUnit;
  * 处理接收到的 http 响应
  */
 public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
+
+    private static final Logger logger = LoggerFactory.getLogger(ApplicationClient.class);
 
     private RegistryClient app;
 
@@ -97,10 +101,10 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             throw new Exception("Client thread was interrupted.");
         do {
             if (mainQueue.add(executor)) {
+                logger.debug(executor.getTaskId() + " queue subTask successfully.");
                 break;
             }
         } while (true);
-
     }
 
     protected static class HttpTaskQueueConsumer implements Runnable{
@@ -109,7 +113,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
         RegistryClient client;
         Thread thread;
 
-        int maxTolerateTimeMills;
+        int maxTolerateTimeMills; // 最大的等待第二队列时间
         int heartBeatIntervals;
 
         BlockingQueue<HttpTaskCarrierExecutor> selfNextTaskQueue;
@@ -125,11 +129,13 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
                     // thread pool submit to do
                     if (!selfNextTaskQueue.offer(take)) { // 非阻塞
                         // 满了
+                        logger.debug("doPacket selfNextTaskQueue is full.");
                         doPacket();
                         lastDoPacket = System.currentTimeMillis();
                     } else { // 未满
                         if (lastDoPacket - System.currentTimeMillis() >= maxTolerateTimeMills) {
                             // 时间到了
+                            logger.debug("doPacket maxTolerateTimeMills is full.");
                             doPacket();
                             lastDoPacket = System.currentTimeMillis();
                         }

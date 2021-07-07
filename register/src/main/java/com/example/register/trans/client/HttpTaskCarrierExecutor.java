@@ -10,6 +10,8 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.*;
 import io.netty.util.CharsetUtil;
 import io.netty.util.internal.ObjectUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -25,6 +27,9 @@ import java.util.concurrent.Future;
  * @since 2021/6/19 16:47
  **/
 public class HttpTaskCarrierExecutor {
+
+    private static final Logger logger = LoggerFactory.getLogger(HttpTaskCarrierExecutor.class);
+
     private final Object lock = new Object();
     private ServiceProvider provider; // where
     private FullHttpRequest httpRequest; // for what
@@ -46,6 +51,10 @@ public class HttpTaskCarrierExecutor {
         doneTodo = copy.doneTodo;
         doneTodo.setExecutor(this);
         client = copy.client;
+    }
+
+    public String getTaskId() {
+        return taskId;
     }
 
     public ApplicationClient getClient() {
@@ -265,8 +274,10 @@ public class HttpTaskCarrierExecutor {
     }
 
     public void sync() throws InterruptedException {
+        logger.debug(taskId + " executor's lock wait.");
         synchronized (lock) {
             lock.wait(); // 阻塞等待done Runnable的任务结束，这时候syncer可能为null
+            logger.debug(taskId + " executor's lock notify successfully.");
         }
     }
 

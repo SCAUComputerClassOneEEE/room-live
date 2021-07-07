@@ -1,8 +1,12 @@
 package com.example.register.trans.client;
 
+import com.example.register.process.DiscoveryNodeProcess;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class ProcessedRunnable implements Runnable {
+    private static final Logger logger = LoggerFactory.getLogger(ProcessedRunnable.class);
 
     private HttpTaskCarrierExecutor process;
 
@@ -16,19 +20,14 @@ public abstract class ProcessedRunnable implements Runnable {
             try {
                 successAndThen(process.getResultStatus(), process.getResultString());
             } catch (Exception e) {
-                System.out.println("i don't know what happened, maybe json parsing.");
-                e.printStackTrace();
+                logger.error("when HttpTaskCarrierExecutor execSuccess " + process.getTaskId() + " but " + e.getMessage());
             }
         } else {
-            try {
-                failAndThen(process.getErrorType(), process.getResultString());
-            } catch (Exception e) {
-                process.getClient().stopThread();
-                e.printStackTrace();
-            }
+            failAndThen(process.getErrorType(), process.getResultString());
         }
         synchronized (process.getLock()) {
             process.getLock().notify();
+            logger.debug(process.getTaskId() + " executor's lock notify");
         }
     }
 
@@ -44,7 +43,7 @@ public abstract class ProcessedRunnable implements Runnable {
      * @param resultString HTTP 请求失败后的报错信息
      * @param errorType HTTP 请求失败的出错状态
      * */
-    public void failAndThen(ResultType errorType, String resultString) throws Exception {
+    public void failAndThen(ResultType errorType, String resultString) {
 
     }
 

@@ -24,17 +24,15 @@ public interface RegistryClient extends Application, MethodNestable {
         }
     }
 
-    void register(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception;
+    void register(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/);
 
-    void renew(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer) throws Exception;
+    void renew(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer);
 
-    void offline(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) throws Exception;
+    void offline(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/);
     // get
     void discover(ServiceProvider peer, String appName, boolean sync) throws Exception;
 
     void replicate(ServiceProvider carryNode, ReplicationAction action, boolean sync, boolean comeFromPeer) throws Exception;
-
-
 
     ServiceProvider getMyself();
 

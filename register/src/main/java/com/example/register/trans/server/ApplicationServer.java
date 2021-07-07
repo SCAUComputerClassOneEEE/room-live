@@ -3,6 +3,7 @@ package com.example.register.trans.server;
 import com.example.register.process.Application;
 import com.example.register.process.NameCenterPeerProcess;
 import com.example.register.process.RegistryServer;
+import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.ApplicationThread;
 import io.netty.bootstrap.ServerBootstrap;
@@ -14,7 +15,10 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import lombok.SneakyThrows;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -22,6 +26,8 @@ import java.util.concurrent.TimeUnit;
  * @since 2021/6/9 22:02
  **/
 public class ApplicationServer extends ApplicationThread<ServerBootstrap, ServerChannel> {
+
+    private static final Logger logger = LoggerFactory.getLogger(ApplicationServer.class);
 
     private NameCenterPeerProcess app;
     private final EventLoopGroup boosGroup = new NioEventLoopGroup(1);
@@ -31,9 +37,11 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
 
     protected static class ServerScanRunnable implements Runnable{
         ApplicationServer server;
+        int heartBeatIntervals;
 
-        void setServer(ApplicationServer server) {
+        void init(ApplicationServer server, int heartBeatIntervals) {
             this.server = server;
+            this.heartBeatIntervals = heartBeatIntervals;
         }
 
         @Override
@@ -42,29 +50,43 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
             NameCenterPeerProcess app = server.app;
             try {
                 ChannelFuture bind = bootstrap.bind().sync();
+                logger.info("server bind " + bootstrap.config().localAddress().toString() + " " + bind.isSuccess());
                 if (bind.isSuccess()) {
-                    while (true) {
-                        try {
-
-                        } catch (Exception e) {
-                            break;
+                    timerTaskScan(app);
+                    Timer timer = new Timer();
+                    timer.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            timerTaskScan(app);
                         }
-                    }
+                    }, heartBeatIntervals);
                 } else {
                     server.stopThread();
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-            } finally{
+                logger.error("server runnable error: " + e.getMessage());
+            } finally {
+                logger.info("server end");
                 server.stopThread();
             }
 
+        }
+
+        void timerTaskScan(NameCenterPeerProcess server) {
+            Map<String, Set<ServiceProvider>> noBeatMap = server.scan();
+
+            noBeatMap.forEach((appName, apps)->{
+                for (ServiceProvider app : apps) {
+                    logger.debug("have no new heat " + app.toString());
+                    server.offline(app, false, true, false);
+                }
+            });
         }
     }
 
     public ApplicationServer(Application application, ServiceProvidersBootConfig config) throws Exception {
         super(runnable);
-        runnable.setServer(this);
+        runnable.init(this, config.getHeartBeatIntervals());
         init(application, config);
     }
 
