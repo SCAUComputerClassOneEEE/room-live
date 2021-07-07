@@ -3,7 +3,7 @@ package com.example.register.trans.client;
 import com.example.register.process.Application;
 import com.example.register.process.DiscoveryNodeProcess;
 import com.example.register.process.RegistryClient;
-import com.example.register.serviceInfo.ServiceProvidersBootConfig;
+import com.example.register.process.ApplicationBootConfig;
 import com.example.register.trans.ApplicationThread;
 import com.example.register.utils.HttpTaskExecutorPool;
 import io.netty.bootstrap.Bootstrap;
@@ -41,13 +41,13 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
 
     private static final HttpTaskQueueConsumer runner = new HttpTaskQueueConsumer(); // 可以改成多个子执行器 list，麻烦。。。
 
-    public ApplicationClient(Application application, ServiceProvidersBootConfig config) throws Exception {
+    public ApplicationClient(Application application, ApplicationBootConfig config) throws Exception {
         super(runner);
         init(application, config);
     }
 
     @Override
-    protected void init(Application application, ServiceProvidersBootConfig config) throws Exception {
+    protected void init(Application application, ApplicationBootConfig config) throws Exception {
         if (this.isAlive()) return;
 
         if (application instanceof DiscoveryNodeProcess) {

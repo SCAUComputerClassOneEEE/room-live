@@ -2,7 +2,7 @@ package com.example.register.trans;
 
 
 import com.example.register.process.Application;
-import com.example.register.serviceInfo.ServiceProvidersBootConfig;
+import com.example.register.process.ApplicationBootConfig;
 import io.netty.bootstrap.AbstractBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -14,7 +14,7 @@ public abstract class ApplicationThread<B extends AbstractBootstrap<B, C>, C ext
     public ApplicationThread(Runnable runnable) {
         super(runnable);
     }
-    protected abstract void init(Application application, ServiceProvidersBootConfig config) throws Exception;
+    protected abstract void init(Application application, ApplicationBootConfig config) throws Exception;
     public void stopThread() {
         if (future != null && future.channel().isActive()) {
             try {

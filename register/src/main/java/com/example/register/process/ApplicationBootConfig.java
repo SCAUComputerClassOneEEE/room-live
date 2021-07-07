@@ -1,12 +1,13 @@
-package com.example.register.serviceInfo;
+package com.example.register.process;
 
 import com.example.register.process.RegistryServer;
+import com.example.register.serviceInfo.ServiceProvider;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
-public class ServiceProvidersBootConfig {
+public class ApplicationBootConfig {
     // myself
     private ServiceProvider selfNode;
     // others server

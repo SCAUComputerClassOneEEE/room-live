@@ -2,18 +2,9 @@ package com.example.register.process;
 
 
 import com.example.register.serviceInfo.ServiceProvider;
-import com.example.register.serviceInfo.ServiceProvidersBootConfig;
-import com.example.register.trans.client.HttpTaskCarrierExecutor;
-import com.example.register.trans.client.ProcessedRunnable;
-import com.example.register.trans.client.ResultType;
 import com.example.register.trans.server.ApplicationServer;
-import com.example.register.utils.JSONUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
-import io.netty.handler.codec.http.HttpMethod;
-import io.netty.handler.codec.http.HttpResponseStatus;
 
 import java.util.*;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -44,7 +35,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
 
     // 注册表
 
-    public NameCenterPeerProcess(ServiceProvidersBootConfig config) throws Exception {
+    public NameCenterPeerProcess(ApplicationBootConfig config) throws Exception {
         super(config);
         init(config);
     }
@@ -63,7 +54,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
      * setup 3 准备对外服务
      */
     @Override
-    protected void init(ServiceProvidersBootConfig config) throws Exception {
+    protected void init(ApplicationBootConfig config) throws Exception {
         if (config.getServerClusterType().equals(ClusterType.P2P)) {
             syncAll(true);
         }

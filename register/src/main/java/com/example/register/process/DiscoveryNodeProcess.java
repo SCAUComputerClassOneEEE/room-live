@@ -3,14 +3,11 @@ package com.example.register.process;
 
 import com.example.register.serviceInfo.ServiceApplicationsTable;
 import com.example.register.serviceInfo.ServiceProvider;
-import com.example.register.serviceInfo.ServiceProvidersBootConfig;
 import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
 import com.example.register.trans.client.ProcessedRunnable;
 import com.example.register.trans.client.ResultType;
 import com.example.register.utils.JSONUtil;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
@@ -75,11 +72,11 @@ public class DiscoveryNodeProcess implements RegistryClient{
     protected ApplicationClient client;
     protected ServiceProvider mySelf;
 
-    public DiscoveryNodeProcess(ServiceProvidersBootConfig config) throws Exception {
+    public DiscoveryNodeProcess(ApplicationBootConfig config) throws Exception {
         init(config);
     }
 
-    protected void init(ServiceProvidersBootConfig config) throws Exception {
+    protected void init(ApplicationBootConfig config) throws Exception {
         mySelf = config.getSelfNode();
         // initialize the table with config and myself
         table = new ServiceApplicationsTable(

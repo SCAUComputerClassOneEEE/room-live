@@ -2,9 +2,8 @@ package com.example.register.trans.server;
 
 import com.example.register.process.Application;
 import com.example.register.process.NameCenterPeerProcess;
-import com.example.register.process.RegistryServer;
 import com.example.register.serviceInfo.ServiceProvider;
-import com.example.register.serviceInfo.ServiceProvidersBootConfig;
+import com.example.register.process.ApplicationBootConfig;
 import com.example.register.trans.ApplicationThread;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -14,7 +13,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.timeout.WriteTimeoutHandler;
-import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,14 +82,14 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
         }
     }
 
-    public ApplicationServer(Application application, ServiceProvidersBootConfig config) throws Exception {
+    public ApplicationServer(Application application, ApplicationBootConfig config) throws Exception {
         super(runnable);
         runnable.init(this, config.getHeartBeatIntervals());
         init(application, config);
     }
 
     @Override
-    protected void init(Application application, ServiceProvidersBootConfig config) throws Exception {
+    protected void init(Application application, ApplicationBootConfig config) throws Exception {
         if (this.isAlive()) return;
 
         if (application instanceof NameCenterPeerProcess) {

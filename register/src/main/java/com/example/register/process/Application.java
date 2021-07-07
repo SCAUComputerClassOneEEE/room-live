@@ -1,7 +1,5 @@
 package com.example.register.process;
 
-import com.example.register.serviceInfo.ServiceProvidersBootConfig;
-
 /**
  *
  * 对集群服务的所有机器进程的抽象接口

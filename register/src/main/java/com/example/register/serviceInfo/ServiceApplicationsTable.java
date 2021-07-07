@@ -1,11 +1,10 @@
 package com.example.register.serviceInfo;
 
+import com.example.register.process.ApplicationBootConfig;
 import com.example.register.utils.CollectionUtil;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * map appName --> ServiceProvider
@@ -57,7 +56,7 @@ public class ServiceApplicationsTable {
     * */
     private final ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> doubleMarkMap;
 
-    public ServiceApplicationsTable(ServiceProvidersBootConfig config, /*初始化时候的服务列表*/
+    public ServiceApplicationsTable(ApplicationBootConfig config, /*初始化时候的服务列表*/
                                     String selfAppName/*自己的appName*/) {
         doubleMarkMap = new ConcurrentHashMap<>();
         ServiceProvider selfNode = config.getSelfNode();
