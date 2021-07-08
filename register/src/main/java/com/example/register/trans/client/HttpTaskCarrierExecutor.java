@@ -206,6 +206,7 @@ public class HttpTaskCarrierExecutor {
     *                        channel inactive --> SUCCESS           --> syncSuccess
     * */
     protected void success(FullHttpResponse result) {
+        logger.info(taskId + "success");
         endExec = System.currentTimeMillis();
         provider.fixAccessAvg(endExec - startExec);
         provider.decrementConnectingInt();
@@ -214,6 +215,7 @@ public class HttpTaskCarrierExecutor {
     }
 
     protected void fail(ResultType type, Throwable cause) {
+        logger.info(taskId + " fail because of " + type.name()+ ": " + cause.getMessage());
         endExec = System.currentTimeMillis();
         provider.fixAccessAvg(endExec - startExec);
         provider.decrementConnectingInt();
@@ -224,6 +226,7 @@ public class HttpTaskCarrierExecutor {
     protected void connectAndSend() {
         try {
             // connect
+            logger.debug(taskId + " try to connect " + provider);
             ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getHost(), provider.port()).await();
             if (!sync.isSuccess()) {
                 /*
@@ -239,7 +242,10 @@ public class HttpTaskCarrierExecutor {
             ChannelFuture send = sync.channel().writeAndFlush(httpRequest);
             startExec = System.currentTimeMillis();
             provider.incrementConnectingInt();
-            send.addListener((ChannelFutureListener) channelFuture -> HttpTaskExecutorPool.taskMap.put(taskId, this));
+            send.addListener((ChannelFutureListener) channelFuture -> {
+                logger.info(taskId + " connect success and then put into table");
+                HttpTaskExecutorPool.taskMap.put(taskId, this);
+            });
         } catch (Exception e) {
             fail(ResultType.RUNTIME_EXCEPTION, e);
         }

@@ -73,22 +73,28 @@ public class DiscoveryNodeProcess implements RegistryClient{
     protected ServiceProvider mySelf;
 
     public DiscoveryNodeProcess(ApplicationBootConfig config) throws Exception {
-        init(config);
+        this.init(config);
     }
 
     protected void init(ApplicationBootConfig config) throws Exception {
         mySelf = config.getSelfNode();
         // initialize the table with config and myself
-        table = new ServiceApplicationsTable(
-                config,
-                ServiceApplicationsTable.SERVER_PEER_NODE);
-        // initialize the client and server's thread worker for working.
-        client = new ApplicationClient(this, config);
-        client.start();
+        try {
+            table = new ServiceApplicationsTable(config);
+            // initialize the client and server's thread worker for working.
+            client = new ApplicationClient(this, config);
+            client.start();
+        } catch (Exception e) {
+            logger.error("DiscoveryNodeProcess boot error" + e.getMessage());
+            throw e;
+        }
+        logger.info("client init...");
         /*
         * register myself
         * */
-        register(config.getSelfNode(),true, false, false);
+        if (!mySelf.isPeer())
+            register(config.getSelfNode(),true, false, false);
+        logger.info("client register to " + (mySelf.isPeer() ? "echo peer" : "first peer"));
     }
 
     @Override
@@ -126,13 +132,14 @@ public class DiscoveryNodeProcess implements RegistryClient{
         if (who == null) {
             who = mySelf;
         }
-        logger.debug("try to register " + who.toString());
+        logger.debug("try to register\n " + who.toString());
         table.putAppIfAbsent(who.getAppName(), who);
         try {
             if (!secondPeer)
                 replicate(who, ReplicationAction.REGISTER, sync, callByPeer);
         } catch (Exception e) {
             logger.error("when register " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -141,7 +148,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
         if (who == null) {
             who = mySelf;
         }
-        logger.debug("try to offline " + who.toString());
+        logger.debug("try to offline\n " + who.toString());
         table.removeApp(who);
         try {
             if (!secondPeer)
@@ -163,13 +170,14 @@ public class DiscoveryNodeProcess implements RegistryClient{
         if (who == null) {
             who = mySelf;
         }
-        logger.debug("try to renew " + who.toString());
+        logger.debug("try to renew\n " + who.toString());
         table.renewApp(who);
         try {
             if (!secondPeer)
                 replicate(who, ReplicationAction.RENEW, sync, callByPeer);
         } catch (Exception e) {
             logger.error("when renew " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -240,27 +248,29 @@ public class DiscoveryNodeProcess implements RegistryClient{
                 ? table.getServers() : myPeerTemp.iterator();
         while (servers.hasNext()) {
             ServiceProvider myConPeer = servers.next();
-            String url = action.getAction();
-            HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
-                    .byClient(client)
-                    .access(HttpMethod.POST, "/" + url)
-                    .connectWith(myConPeer)
-                    .addHeader("REPLICATION", callByPeer ? "PEER" : "NODE")
-                    .addHeader("Content-Type", "text/plain")
-                    .addHeader("content-length", body.length())
-                    .done(new ProcessedRunnable() {
-                        @Override
-                        public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
+            if (!myConPeer.equals(carryNode) && !mySelf.equals(myConPeer)) {
+                String url = action.getAction();
+                HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
+                        .byClient(client)
+                        .access(HttpMethod.POST, "/" + url)
+                        .connectWith(myConPeer)
+                        .addHeader("REPLICATION", callByPeer ? "PEER" : "NODE")
+                        .addHeader("Content-Type", "text/plain")
+                        .addHeader("content-length", body.length())
+                        .done(new ProcessedRunnable() {
+                            @Override
+                            public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
 
-                        }
-                        @Override
-                        public void failAndThen(ResultType errorType, String resultString) {
-                            offline(carryNode, false, callByPeer, false);
-                        }
-                    }).withBody(body).create();
-            /*block to sub taskQueue*/
-            executor.sub();
-            executors.add(executor);
+                            }
+                            @Override
+                            public void failAndThen(ResultType errorType, String resultString) {
+                                offline(carryNode, false, callByPeer, false);
+                            }
+                        }).withBody(body).create();
+                /*block to sub taskQueue*/
+                executor.sub();
+                executors.add(executor);
+            }
             servers.remove();
         }
         /*wait until executor's doneRunnable end*/

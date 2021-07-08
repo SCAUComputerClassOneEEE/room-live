@@ -3,6 +3,8 @@ package com.example.register.process;
 
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.trans.server.ApplicationServer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -28,6 +30,9 @@ import java.util.stream.Collectors;
  */
 public class NameCenterPeerProcess extends DiscoveryNodeProcess implements RegistryServer {
 
+    private static final Logger logger = LoggerFactory.getLogger(NameCenterPeerProcess.class);
+    private RegistryServer.ClusterType clusterType;
+
     private ApplicationServer server;
     private int heartBeatIntervals;
 
@@ -37,7 +42,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
 
     public NameCenterPeerProcess(ApplicationBootConfig config) throws Exception {
         super(config);
-        init(config);
+        this.init0(config);
     }
 
     /**
@@ -53,17 +58,18 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
      *      -
      * setup 3 准备对外服务
      */
-    @Override
-    protected void init(ApplicationBootConfig config) throws Exception {
+    void init0(ApplicationBootConfig config) throws Exception {
         if (config.getServerClusterType().equals(ClusterType.P2P)) {
             syncAll(true);
         }
+        clusterType = config.getServerClusterType();
         /*
         *
         * start server
         * */
         server = new ApplicationServer(this, config);
         heartBeatIntervals = config.getHeartBeatIntervals();
+        logger.info("server init...");
     }
 
     /**
@@ -76,6 +82,8 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
         // only once
         super.start();
         server.start();
+        if (clusterType.equals(ClusterType.P2P))
+            register(mySelf, false, true, false);
     }
 
     /**

@@ -50,18 +50,25 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
                 ChannelFuture bind = bootstrap.bind().sync();
                 logger.info("server bind " + bootstrap.config().localAddress().toString() + " " + bind.isSuccess());
                 if (bind.isSuccess()) {
-                    timerTaskScan(app);
-                    Timer timer = new Timer();
-                    timer.schedule(new TimerTask() {
-                        @Override
-                        public void run() {
-                            timerTaskScan(app);
-                        }
-                    }, heartBeatIntervals);
+//                    timerTaskScan(app);
+//                    Timer timer = new Timer();
+//                    timer.schedule(new TimerTask() {
+//                        @Override
+//                        public void run() {
+//                            timerTaskScan(app);
+//                        }
+//                    }, heartBeatIntervals);
+                    while (true) {
+                        long s = System.currentTimeMillis();
+                        timerTaskScan(app);
+                        long e = System.currentTimeMillis();
+                        Thread.sleep(heartBeatIntervals - (e-s));
+                    }
                 } else {
                     server.stopThread();
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 logger.error("server runnable error: " + e.getMessage());
             } finally {
                 logger.info("server end");
@@ -71,11 +78,13 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
         }
 
         void timerTaskScan(NameCenterPeerProcess server) {
+//            logger.debug("time to scan table.");
             Map<String, Set<ServiceProvider>> noBeatMap = server.scan();
 
             noBeatMap.forEach((appName, apps)->{
                 for (ServiceProvider app : apps) {
-                    logger.debug("have no new heat " + app.toString());
+                    if (app.getMask().equals(server.getMyself().getMask())) continue;
+                    logger.debug("have no new heat " + app);
                     server.offline(app, false, true, false);
                 }
             });

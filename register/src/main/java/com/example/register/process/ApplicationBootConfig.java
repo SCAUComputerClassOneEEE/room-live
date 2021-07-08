@@ -68,8 +68,6 @@ public class ApplicationBootConfig {
 
     public void setServerClusterType(RegistryServer.ClusterType serverClusterType) {
         this.serverClusterType = serverClusterType;
-        if (serverClusterType.equals(RegistryServer.ClusterType.SINGLE))
-            othersPeerServerNodes = null;
     }
 
     public Comparator<ServiceProvider> getTableSetRankComparator() {

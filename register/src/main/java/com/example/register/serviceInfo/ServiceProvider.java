@@ -31,10 +31,17 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
 
     public ServiceProvider(String appName, String host, int port) {
         mask = UUID.randomUUID().toString();
+        this.host = host;
+        this.port = port;
         this.appName = appName;
         connectingInt = new AtomicInteger(0);
         historyInt = new AtomicInteger(0);
         avgAccess = new AtomicDouble(0.0);
+        lastRenewStamp = new Timestamp(new Date().getTime());
+    }
+
+    public boolean isPeer() {
+        return appName.equals(ServiceApplicationsTable.SERVER_PEER_NODE);
     }
 
     public String getMask() { return mask; }

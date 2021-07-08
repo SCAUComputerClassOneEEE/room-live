@@ -1,6 +1,9 @@
 package com.example.register;
 
+import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.utils.CollectionUtil;
+import com.example.register.utils.JSONUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.util.Date;
 import java.util.HashSet;
@@ -23,14 +26,8 @@ public class UtilTest {
 //        System.out.println(s);
 //    }
 
-    public static void main(String[] args) {
-        Timer timer = new Timer();
-        System.out.println(new Date());
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                System.out.println(new Date());
-            }
-        }, 1000, 1000);
+    public static void main(String[] args) throws JsonProcessingException {
+        ServiceProvider serviceProvider = new ServiceProvider("client0", "123:123:123:0", 9000);
+        System.out.println(JSONUtil.writeValue(serviceProvider));
     }
 }

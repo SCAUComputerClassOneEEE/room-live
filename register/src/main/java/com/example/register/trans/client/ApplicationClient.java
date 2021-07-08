@@ -17,6 +17,7 @@ import io.netty.handler.timeout.ReadTimeoutHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -125,23 +126,25 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             long lastRenewStamp = System.currentTimeMillis();
             while (true) {
                 try {
-                    HttpTaskCarrierExecutor take = taskQueue.take(); // 阻塞
+//                    logger.info("waiting if queue has any task.");
+                    HttpTaskCarrierExecutor take = taskQueue.poll(); // 阻塞
                     // thread pool submit to do
-                    if (!selfNextTaskQueue.offer(take)) { // 非阻塞
+                    if (take != null && !selfNextTaskQueue.offer(take)) { // 非阻塞
                         // 满了
-                        logger.debug("doPacket selfNextTaskQueue is full.");
+                        //logger.debug("doPacket selfNextTaskQueue is full.");
                         doPacket();
                         lastDoPacket = System.currentTimeMillis();
-                    } else { // 未满
-                        if (lastDoPacket - System.currentTimeMillis() >= maxTolerateTimeMills) {
-                            // 时间到了
-                            logger.debug("doPacket maxTolerateTimeMills is full.");
-                            doPacket();
-                            lastDoPacket = System.currentTimeMillis();
-                        }
                     }
-                    if (lastRenewStamp - System.currentTimeMillis() >= heartBeatIntervals) {
-                        client.renew(client.getMyself(), false, false, false); // 心跳
+                    if (System.currentTimeMillis() - lastDoPacket >= maxTolerateTimeMills) {
+                        // 时间到了
+                        //logger.debug("doPacket maxTolerateTimeMills is full.");
+                        doPacket();
+                        lastDoPacket = System.currentTimeMillis();
+                    }
+
+                    if (System.currentTimeMillis() - lastRenewStamp >= heartBeatIntervals) {
+                        // client.renew(client.getMyself(), false, client.getMyself().isPeer(), false); // 心跳
+                        lastRenewStamp = System.currentTimeMillis();
                     }
                 } catch (Exception e) {
                     // thread interrupt, and while break out
@@ -150,9 +153,15 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             }
         }
 
-        void doPacket() {
-            HttpTaskCarrierExecutor[] httpTaskCarrierExecutors = (HttpTaskCarrierExecutor[]) selfNextTaskQueue.toArray();
-            pool.submit(() -> {
+        void doPacket() throws InterruptedException {
+            LinkedList<HttpTaskCarrierExecutor> httpTaskCarrierExecutors = new LinkedList<>();
+            while (!selfNextTaskQueue.isEmpty()) {
+                httpTaskCarrierExecutors.add(selfNextTaskQueue.take());
+            }
+            if (httpTaskCarrierExecutors.size() == 0) {
+                return;
+            }
+            pool.execute(() -> {
                 for (HttpTaskCarrierExecutor executor : httpTaskCarrierExecutors)
                     executor.connectAndSend();
             });

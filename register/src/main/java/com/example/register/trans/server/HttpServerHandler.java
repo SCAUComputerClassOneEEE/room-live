@@ -18,6 +18,8 @@ import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import io.netty.util.CharsetUtil;
 import io.netty.util.internal.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -29,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+    private static final Logger logger = LoggerFactory.getLogger(HttpServerHandler.class);
 
     private final NameCenterPeerProcess app;
     private String taskId;
@@ -65,6 +68,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     private void getMethod(ChannelHandlerContext cxt, FullHttpRequest request) throws Exception {
         String uri = request.uri();
+        logger.info("get one FullHttpRequest" + uri);
         if (StringUtil.isNullOrEmpty(uri)){
             throw new RuntimeException("uri is null.");
         }
@@ -101,6 +105,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         if (!uri.equals("/antiReplication")) {
             serviceProvider = JSONUtil.readValue(content, ServiceProvider.class);
         }
+        logger.info("post one FullHttpRequest " + uri);
         switch (uri) {
             case "/register" :      app.register(serviceProvider, false, true, secondPeer);
                                     break;

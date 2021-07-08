@@ -56,18 +56,18 @@ public class ServiceApplicationsTable {
     * */
     private final ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> doubleMarkMap;
 
-    public ServiceApplicationsTable(ApplicationBootConfig config, /*初始化时候的服务列表*/
-                                    String selfAppName/*自己的appName*/) {
+    public ServiceApplicationsTable(ApplicationBootConfig config/*初始化时候的服务列表*/) throws Exception {
         doubleMarkMap = new ConcurrentHashMap<>();
         ServiceProvider selfNode = config.getSelfNode();
         ConcurrentHashMap<String,ServiceProvider> selfSet = new ConcurrentHashMap<>();
         selfSet.put(selfNode.getMask(), selfNode);
-        doubleMarkMap.put(selfAppName, selfSet);
+        doubleMarkMap.put(selfNode.getAppName(), selfSet);
 
-        ConcurrentHashMap<String,ServiceProvider> othersSet = new ConcurrentHashMap<>();
+        ConcurrentHashMap<String,ServiceProvider> othersSet;
         Map<String, ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
-        if (othersPeerServerNodes != null)
-            othersSet.putAll(othersPeerServerNodes);
+        if (othersPeerServerNodes != null && othersPeerServerNodes.size() != 0)
+            othersSet = new ConcurrentHashMap<>(othersPeerServerNodes);
+        else throw new Exception("Other peers set is null or empty");
         doubleMarkMap.put(SERVER_PEER_NODE, othersSet);
     }
 
@@ -145,7 +145,7 @@ public class ServiceApplicationsTable {
         if (appsAsSet.size() == 0)
             return null;
         Object[] objects = appsAsSet.stream().sorted(new FastestResponseComparator()).distinct().toArray();
-        return ((ServiceProvider[]) objects)[0];
+        return (ServiceProvider)objects[0];
     }
 
     public Iterator<ServiceProvider> getServers() {

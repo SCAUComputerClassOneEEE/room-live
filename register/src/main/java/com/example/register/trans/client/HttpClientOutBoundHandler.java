@@ -8,8 +8,12 @@ import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.util.AttributeKey;
 import io.netty.util.internal.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HttpClientOutBoundHandler extends ChannelOutboundHandlerAdapter {
+
+    private static final Logger logger = LoggerFactory.getLogger(HttpClientOutBoundHandler.class);
 
     private RegistryClient app;
     private final AttributeKey<String> taskId = AttributeKey.valueOf("taskId");
@@ -27,10 +31,10 @@ public class HttpClientOutBoundHandler extends ChannelOutboundHandlerAdapter {
                 HttpTaskExecutorPool.taskMap.get(taskIdUUID)
                         .fail(ResultType.RUNTIME_EXCEPTION, new RuntimeException("no taskId"));
             else {
+                logger.info(taskIdUUID + " write out");
                 ctx.channel().attr(taskId).set(taskIdUUID);
                 super.write(ctx, msg, promise);
             }
         }
-        super.write(ctx, msg, promise);
     }
 }
