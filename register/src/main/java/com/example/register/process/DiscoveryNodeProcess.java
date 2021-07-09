@@ -241,7 +241,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
     public final void replicate(ServiceProvider carryNode,
                           ReplicationAction action,
                           boolean sync, boolean callByPeer) throws Exception {
-        String body = carryNode.toString();
+        String body = JSONUtil.writeValue(carryNode);
         List<HttpTaskCarrierExecutor> executors = new LinkedList<>();
         List<ServiceProvider> myPeerTemp = new LinkedList<>();
         myPeerTemp.add(table.getOptimalServer());

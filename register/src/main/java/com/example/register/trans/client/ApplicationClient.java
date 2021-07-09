@@ -139,7 +139,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
                     }
 
                     if (System.currentTimeMillis() - lastRenewStamp >= heartBeatIntervals) {
-                        // client.renew(client.getMyself(), false, client.getMyself().isPeer(), false); // 心跳
+                        client.renew(client.getMyself(), false, client.getMyself().isPeer(), false); // 心跳
                         lastRenewStamp = System.currentTimeMillis();
                     }
                 } catch (Exception e) {
