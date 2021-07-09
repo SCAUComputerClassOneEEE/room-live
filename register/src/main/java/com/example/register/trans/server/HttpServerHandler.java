@@ -24,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.sql.SQLOutput;
 import java.sql.Timestamp;
 import java.util.Date;
 import java.util.HashMap;
@@ -42,6 +44,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     protected void channelRead0(ChannelHandlerContext cxt, FullHttpRequest request) throws Exception {
+        logger.debug("Read:\n" + request);
         try {
             if (!app.isRunning()) {
                 throw new RuntimeException("server thread end.");
@@ -100,7 +103,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         boolean secondPeer = replication.equals("PEER");
         InetSocketAddress address = (InetSocketAddress)(cxt.channel().remoteAddress());
         String uri = request.uri();
-        String content = request.content().toString(CharsetUtil.UTF_8);
+        String content = request.content().toString(StandardCharsets.UTF_8);
         ServiceProvider serviceProvider = null;
         if (!uri.equals("/antiReplication")) {
             serviceProvider = JSONUtil.readValue(content, ServiceProvider.class);
@@ -123,9 +126,14 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     private void response(ChannelHandlerContext cxt, HttpResponseStatus status, String c) {
+        if (taskId == null) {
+            cxt.channel().closeFuture();
+            return;
+        }
         DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
                 status,
                 Unpooled.copiedBuffer(c, CharsetUtil.UTF_8));
+        logger.debug("response: " + status);
         response.headers().add("taskId", taskId);
         cxt.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
     }
@@ -133,6 +141,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         HttpResponseStatus error;
+        logger.debug("exceptionCaught:" + cause.getMessage());
         if (cause instanceof WriteTimeoutException) {
             error = HttpResponseStatus.NO_CONTENT;
         } else {

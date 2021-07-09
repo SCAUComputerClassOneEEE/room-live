@@ -17,9 +17,9 @@ public class HttpTaskExecutorPool extends ThreadPoolExecutor {
     * */
     public static final ConcurrentHashMap<String/*taskId*/, HttpTaskCarrierExecutor> taskMap = new ConcurrentHashMap<>();
 
-    private static final int DEFAULT_CORE_SIZE = 2;
+    private static final int DEFAULT_CORE_SIZE = 5;
     private static final int DEFAULT_MAX_SIZE = 10;
-    private static final long DEFAULT_KEEP_ALIVE = 2;
+    private static final long DEFAULT_KEEP_ALIVE = 100;
 
     private static volatile HttpTaskExecutorPool INSTANCE;
 

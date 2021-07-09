@@ -7,12 +7,19 @@ import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
 import com.example.register.trans.client.ProcessedRunnable;
 import com.example.register.trans.client.ResultType;
+import com.example.register.utils.HttpTaskExecutorPool;
 import com.example.register.utils.JSONUtil;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelFuture;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 
@@ -88,7 +95,6 @@ public class DiscoveryNodeProcess implements RegistryClient{
             logger.error("DiscoveryNodeProcess boot error" + e.getMessage());
             throw e;
         }
-        logger.info("client init...");
         /*
         * register myself
         * */
@@ -132,7 +138,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
         if (who == null) {
             who = mySelf;
         }
-        logger.debug("try to register\n " + who.toString());
+        logger.debug("try to register " + who.toString());
         table.putAppIfAbsent(who.getAppName(), who);
         try {
             if (!secondPeer)
@@ -148,7 +154,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
         if (who == null) {
             who = mySelf;
         }
-        logger.debug("try to offline\n " + who.toString());
+        logger.debug("try to offline " + who.toString());
         table.removeApp(who);
         try {
             if (!secondPeer)
@@ -170,7 +176,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
         if (who == null) {
             who = mySelf;
         }
-        logger.debug("try to renew\n " + who.toString());
+        logger.debug("try to renew " + who.toString());
         table.renewApp(who);
         try {
             if (!secondPeer)
@@ -239,39 +245,34 @@ public class DiscoveryNodeProcess implements RegistryClient{
         List<HttpTaskCarrierExecutor> executors = new LinkedList<>();
         List<ServiceProvider> myPeerTemp = new LinkedList<>();
         myPeerTemp.add(table.getOptimalServer());
-        /*
-        * if the replication call by a peer, // comeFromPeer = true
+        /* if the replication call by a peer, // comeFromPeer = true
         * it need broadcast this action;
-        * else just to myPeer. // comeFromPeer = false
-        * */
+        * else just to myPeer. // comeFromPeer = false*/
         Iterator<ServiceProvider> servers = callByPeer
                 ? table.getServers() : myPeerTemp.iterator();
         while (servers.hasNext()) {
             ServiceProvider myConPeer = servers.next();
-            if (!myConPeer.equals(carryNode) && !mySelf.equals(myConPeer)) {
+            if (myConPeer == null ) continue;
+            if (!myConPeer.equals(carryNode)/*不向被传播者传播*/ && !myConPeer.equals(mySelf)/*不向自己传播*/) {
                 String url = action.getAction();
                 HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                         .byClient(client)
                         .access(HttpMethod.POST, "/" + url)
                         .connectWith(myConPeer)
                         .addHeader("REPLICATION", callByPeer ? "PEER" : "NODE")
-                        .addHeader("Content-Type", "text/plain")
-                        .addHeader("content-length", body.length())
+                        .addHeader("Content-Type", "json")
+                        .addHeader("content-length", body.getBytes().length)
                         .done(new ProcessedRunnable() {
                             @Override
-                            public void successAndThen(HttpResponseStatus status, String resultString) throws Exception {
-
-                            }
-                            @Override
                             public void failAndThen(ResultType errorType, String resultString) {
-                                offline(carryNode, false, callByPeer, false);
+                                offline(myConPeer, false, callByPeer, false);
                             }
                         }).withBody(body).create();
                 /*block to sub taskQueue*/
                 executor.sub();
                 executors.add(executor);
             }
-            servers.remove();
+//            servers.remove();
         }
         /*wait until executor's doneRunnable end*/
         if (sync)

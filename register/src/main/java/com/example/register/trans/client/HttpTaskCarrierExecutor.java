@@ -2,6 +2,7 @@ package com.example.register.trans.client;
 
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.utils.HttpTaskExecutorPool;
+import com.example.register.utils.JSONUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -32,39 +33,33 @@ public class HttpTaskCarrierExecutor {
 
     private final Object lock = new Object();
     private ServiceProvider provider; // where
-    private FullHttpRequest httpRequest; // for what
     private volatile TaskExecuteResult result;
     private final String taskId;
     private ProcessedRunnable doneTodo;
     private ApplicationClient client; // 发送http
     private long startExec;
     private long endExec;
+    private String body;
+    private HttpMethod method;
+    private String uri;
+    private HttpHeaders headers;
 
     private HttpTaskCarrierExecutor() {
         taskId = UUID.randomUUID().toString();
     }
 
-    public HttpTaskCarrierExecutor(HttpTaskCarrierExecutor copy, ServiceProvider conProvider) {
-        taskId = UUID.randomUUID().toString();
-        provider = conProvider;
-        httpRequest = copy.httpRequest;
-        doneTodo = copy.doneTodo;
-        doneTodo.setExecutor(this);
-        client = copy.client;
-    }
-
     public String getTaskId() {
         return taskId;
     }
-
     public ApplicationClient getClient() {
         return client;
     }
 
     public static class Builder {
         private ServiceProvider builderProvider;
-        private FullHttpRequest builderRequest;
-        private ByteBuf bodyBuf;
+        private String bodyBuf;
+        private HttpMethod bMethod;
+        private String bUri;
         private HttpHeaders builderHeaders;
         private ProcessedRunnable builderRunnable;
         private ApplicationClient builderClient;
@@ -100,40 +95,35 @@ public class HttpTaskCarrierExecutor {
         }
 
         public Builder withBody(String body) {
-            bodyBuf = Unpooled.copiedBuffer(body, StandardCharsets.UTF_8);
+            bodyBuf = body;
             return this;
         }
 
         public Builder access(HttpMethod method, String uri) {
-            builderRequest = new DefaultFullHttpRequest(
-                    HttpVersion.HTTP_1_1,
-                    method, uri);
+            bMethod = method;
+            bUri = uri;
             return this;
         }
-
 
         public HttpTaskCarrierExecutor create() {
             final HttpTaskCarrierExecutor target = new HttpTaskCarrierExecutor();
 
-            builderRequest.replace(
-                    bodyBuf == null ?
-                    Unpooled.copiedBuffer("", StandardCharsets.UTF_8) : bodyBuf
-            );
             builderRunnable.setExecutor(target);
 
             ObjectUtil.checkNotNull(builderClient, "builderClient is null");
             ObjectUtil.checkNotNull(builderProvider, "builderProvider is null");
-            ObjectUtil.checkNotNull(builderRequest, "builderRequest is null, access pre.");
 
             target.client = builderClient;
             target.provider = builderProvider;
-            target.httpRequest = builderRequest;
+            target.method = bMethod;
+            target.uri = bUri;
+            target.body = bodyBuf;
             builderHeaders.add("taskId", target.taskId);
             String accept = builderHeaders.get("Accept");
             if (accept == null || accept.equals("")) {
                 builderHeaders.add("Accept", "application/json");
             }
-            target.httpRequest.headers().add(builderHeaders);
+            target.headers = builderHeaders;
             target.doneTodo = builderRunnable;
             return target;
         }
@@ -206,7 +196,7 @@ public class HttpTaskCarrierExecutor {
     *                        channel inactive --> SUCCESS           --> syncSuccess
     * */
     protected void success(FullHttpResponse result) {
-        logger.info(taskId + "success");
+        logger.info(taskId + " success");
         endExec = System.currentTimeMillis();
         provider.fixAccessAvg(endExec - startExec);
         provider.decrementConnectingInt();
@@ -216,6 +206,7 @@ public class HttpTaskCarrierExecutor {
 
     protected void fail(ResultType type, Throwable cause) {
         logger.info(taskId + " fail because of " + type.name()+ ": " + cause.getMessage());
+        cause.printStackTrace();
         endExec = System.currentTimeMillis();
         provider.fixAccessAvg(endExec - startExec);
         provider.decrementConnectingInt();
@@ -225,27 +216,24 @@ public class HttpTaskCarrierExecutor {
 
     protected void connectAndSend() {
         try {
-            // connect
-            logger.debug(taskId + " try to connect " + provider);
-            ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getHost(), provider.port()).await();
-            if (!sync.isSuccess()) {
-                /*
-                connect time out
-                */
-                fail(ResultType.CONNECT_TIME_OUT, new Exception("connect time out with" + provider.toString()));
-                return;
-            }
-            /*
-             * connect successfully!
-             * send...
-             */
-            ChannelFuture send = sync.channel().writeAndFlush(httpRequest);
             startExec = System.currentTimeMillis();
             provider.incrementConnectingInt();
-            send.addListener((ChannelFutureListener) channelFuture -> {
-                logger.info(taskId + " connect success and then put into table");
+            // connect
+            logger.debug(taskId + " Try to connect with " + provider);
+            ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getHost(), provider.port()).sync();
+            if (!sync.isSuccess()) {
+                /*connect time out */
+                fail(ResultType.CONNECT_TIME_OUT, new Exception("Connect TIMEOUT with" + provider.toString()));
+            } else {
+                DefaultFullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri);
+                httpRequest.content().writeBytes(body.getBytes(StandardCharsets.UTF_8));
+
+                httpRequest.headers().add(headers);
+
+                logger.info(taskId + " connect success and then put into taskMap.\n" + httpRequest);
                 HttpTaskExecutorPool.taskMap.put(taskId, this);
-            });
+                sync.channel().writeAndFlush(httpRequest).sync();
+            }
         } catch (Exception e) {
             fail(ResultType.RUNTIME_EXCEPTION, e);
         }

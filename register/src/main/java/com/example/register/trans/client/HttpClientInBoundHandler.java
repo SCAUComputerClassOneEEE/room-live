@@ -7,6 +7,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.timeout.ReadTimeoutException;
+import io.netty.handler.timeout.WriteTimeoutException;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -79,7 +80,7 @@ public class HttpClientInBoundHandler extends SimpleChannelInboundHandler<FullHt
         if (executor == null) {
             throw new RuntimeException("map haven't this task: " + getTaskId(ctx));
         }
-
-        executor.success(response);
+        if (response != null)
+            executor.success(response);
     }
 }

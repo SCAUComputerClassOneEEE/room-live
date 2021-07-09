@@ -11,9 +11,11 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,8 +37,6 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
 
     private RegistryClient app;
 
-    private EventLoopGroup clientNetWorkLoop;
-
     private static BlockingQueue<HttpTaskCarrierExecutor> mainQueue; // public level 1
     private static BlockingQueue<HttpTaskCarrierExecutor> subQueue;
 
@@ -57,12 +57,12 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             throw new Exception("Client application thread init error.");
         }
         bootstrap = new Bootstrap();
-        clientNetWorkLoop = new NioEventLoopGroup();
         final Bootstrap boots = (Bootstrap)bootstrap;
         final Integer connectTimeOut = config.getConnectTimeOut();
+        final Integer writeTimeOut = config.getWriteTimeOut();
         final Integer readTimeOut = config.getReadTimeOut();
         final int maxContentLength = config.getMaxContentLength();
-        boots.group(clientNetWorkLoop)
+        boots.group(workerGroup)
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeOut) // connect time out 3000ms
                 .handler(new ChannelInitializer<SocketChannel>() {
@@ -71,9 +71,9 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
                         socketChannel.pipeline()
                                 .addLast(new ReadTimeoutHandler(readTimeOut, TimeUnit.MILLISECONDS)) // read time out 5000ms
                                 .addLast(new HttpClientCodec())
-                                .addLast(new HttpObjectAggregator(maxContentLength))
-                                .addLast("task in handler", new HttpClientInBoundHandler(app))
-                                .addLast("task out handler", new HttpClientOutBoundHandler(app));
+//                                .addLast(new HttpObjectAggregator(maxContentLength))
+                                .addLast(new HttpClientInBoundHandler(app))
+                                .addLast(new HttpClientOutBoundHandler(app));
                     }
                 });
 
@@ -89,10 +89,6 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
     public void stopThread() {
 //        runner.interrupt();
         super.stopThread();
-
-        if (!clientNetWorkLoop.isTerminated()) {
-            clientNetWorkLoop.shutdownGracefully();
-        }
         mainQueue.clear();
         subQueue.clear();
     }

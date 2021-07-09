@@ -12,6 +12,8 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +31,6 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
 
     private NameCenterPeerProcess app;
     private final EventLoopGroup boosGroup = new NioEventLoopGroup(1);
-    private final EventLoopGroup workerGroup = new NioEventLoopGroup(1);
 
     private static final ServerScanRunnable runnable = new ServerScanRunnable();
 
@@ -108,6 +109,7 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
         }
         bootstrap = new ServerBootstrap();
         final Integer writeTimeOut = config.getWriteTimeOut();
+        final Integer readTimeOut = config.getReadTimeOut();
         final int maxContentLength = config.getMaxContentLength();
         final int backLog = config.getBackLog();
         int port = config.getServerPort();
@@ -120,7 +122,7 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline()
-                                .addLast(new WriteTimeoutHandler(writeTimeOut, TimeUnit.MILLISECONDS)) // 返回408
+                                .addLast(new ReadTimeoutHandler(readTimeOut, TimeUnit.MILLISECONDS)) // 返回408
                                 .addLast(new HttpServerCodec())
                                 .addLast(new HttpObjectAggregator(maxContentLength))
                                 .addLast(new HttpServerHandler(app));
@@ -133,7 +135,5 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
         super.stopThread();
         if (!boosGroup.isTerminated())
             boosGroup.shutdownGracefully();
-        if (!workerGroup.isTerminated())
-        workerGroup.shutdownGracefully();
     }
 }

@@ -7,6 +7,7 @@ import com.example.register.trans.client.HttpClientOutBoundHandler;
 import com.example.register.utils.JSONUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -20,6 +21,7 @@ import io.netty.util.AttributeMap;
 import io.netty.util.ReferenceCountUtil;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,20 +41,21 @@ class ServiceCenterPeerClientTests {
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         socketChannel.pipeline()
-                                .addLast(new ReadTimeoutHandler(1, TimeUnit.SECONDS)) // read time out 5s
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
                                 .addLast(new Client())
-                                .addLast(new Client2());
+                                .addLast(new HttpClientOutBoundHandler(null));
                     }
                 });
         for (int i = 0; i < 1; i++) {
             ChannelFuture localhost;
-            localhost = bootstrap.connect("localhost", 8080).await();
+            localhost = bootstrap.connect("localhost", 8000).await();
             if (localhost.isSuccess()) {
                 System.out.println("connect success");
-                DefaultFullHttpRequest defaultFullHttpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "");
+                DefaultFullHttpRequest defaultFullHttpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/discover");
                 defaultFullHttpRequest.headers().add("taskId", UUID.randomUUID().toString());
+                defaultFullHttpRequest.replace(Unpooled.copiedBuffer("body", StandardCharsets.UTF_8));
+                System.out.println(defaultFullHttpRequest);
                 localhost.channel().writeAndFlush(defaultFullHttpRequest);
             } else {
                 System.out.println("!connect success");

@@ -6,8 +6,11 @@ import com.example.register.process.ApplicationBootConfig;
 import io.netty.bootstrap.AbstractBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
 
 public abstract class ApplicationThread<B extends AbstractBootstrap<B, C>, C extends Channel> extends Thread {
+    protected static final EventLoopGroup workerGroup = new NioEventLoopGroup(1);
     protected AbstractBootstrap<B, C> bootstrap;
     protected ChannelFuture future;
 
@@ -26,6 +29,8 @@ public abstract class ApplicationThread<B extends AbstractBootstrap<B, C>, C ext
         if (!this.isAlive())
             return;
         this.interrupt();
+        if (!workerGroup.isTerminated())
+            workerGroup.shutdownGracefully();
     }
 
     public final AbstractBootstrap<B, C> getBootstrap() {

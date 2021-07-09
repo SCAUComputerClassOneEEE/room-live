@@ -21,7 +21,7 @@ public class ServiceCenterPeerClientTests2 {
         ServerBootstrap bootstrap = new ServerBootstrap();
         ChannelFuture sync = bootstrap
                 .group(new NioEventLoopGroup(), new NioEventLoopGroup())
-                .localAddress(8080)
+                .localAddress(8000)
                 .channel(NioServerSocketChannel.class)
                 .option(ChannelOption.SO_BACKLOG, 1024)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
@@ -31,7 +31,8 @@ public class ServiceCenterPeerClientTests2 {
                                 .addLast(new WriteTimeoutHandler(3000, TimeUnit.MILLISECONDS)) // 返回408
                                 .addLast(new HttpServerCodec())
                                 .addLast(new HttpObjectAggregator(5 * 1024 * 1024))
-                                .addLast(new HttpServerHandler(null));
+                                .addLast(new Server0())
+                                .addLast(new Server());
                     }
                 }).bind().sync();
         if (sync.isSuccess()) {
@@ -39,7 +40,13 @@ public class ServiceCenterPeerClientTests2 {
         }
     }
 
-
+    static class Server0 extends ChannelInboundHandlerAdapter {
+        @Override
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            System.out.println(msg);
+            ctx.fireChannelRead(msg);
+        }
+    }
 
     static class Server extends SimpleChannelInboundHandler<FullHttpRequest> {
         FullHttpRequest request;
@@ -76,7 +83,7 @@ public class ServiceCenterPeerClientTests2 {
 
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-            System.out.println("channelReadComplete: " + request);
+            System.out.println("channelReadComplete: ");
 
         }
 

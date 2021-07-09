@@ -24,12 +24,12 @@ public class ServerBootTest {
         applicationBootConfig.setBackLog(1024);
         applicationBootConfig.setConnectTimeOut(3* 1000);
         applicationBootConfig.setClientSubExecutors(1); //
-        applicationBootConfig.setHeartBeatIntervals(/*10 * */1000);
+        applicationBootConfig.setHeartBeatIntervals(10 * 1000);
         applicationBootConfig.setMaxContentLength(5 * 1024 * 1024);
         applicationBootConfig.setNextSize(2);
         applicationBootConfig.setMaxTolerateTimeMills(500);
-        applicationBootConfig.setReadTimeOut(20 * 1000);
-        applicationBootConfig.setWriteTimeOut(20 * 1000);
+        applicationBootConfig.setReadTimeOut(10 * 1000);
+        applicationBootConfig.setWriteTimeOut(10 * 1000);
         applicationBootConfig.setTaskQueueMaxSize(100);
 
         applicationBootConfig.setServerPort(8000);

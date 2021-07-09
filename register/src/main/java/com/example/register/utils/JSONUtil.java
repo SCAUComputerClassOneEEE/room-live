@@ -5,6 +5,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.internal.StringUtil;
 
 import java.io.IOException;
@@ -32,5 +34,18 @@ public class JSONUtil {
 
     public static <K, T> Map<K, Set<T>> readMapSetValue(String str) throws IOException {
         return mapper.readValue(str, new TypeReference<Map<K, Set<T>>>(){});
+    }
+
+    public static String printRequest(HttpRequest request) {
+        String uri = request.uri();
+        HttpMethod method = request.method();
+        List<Map.Entry<String, String>> entries = request.headers().entries();
+        StringBuilder headersStr = new StringBuilder();
+        entries.forEach(e->{
+            String value = e.getValue();
+            String key = e.getKey();
+            headersStr.append("<").append(value).append(":").append(key).append(">");
+        });
+        return "{uri:" + uri + ", method: " + method + ", headers: " + headersStr;
     }
 }

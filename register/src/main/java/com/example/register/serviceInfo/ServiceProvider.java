@@ -30,7 +30,6 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
     }
 
     public ServiceProvider(String appName, String host, int port) {
-        mask = UUID.randomUUID().toString();
         this.host = host;
         this.port = port;
         this.appName = appName;
@@ -38,6 +37,7 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         historyInt = new AtomicInteger(0);
         avgAccess = new AtomicDouble(0.0);
         lastRenewStamp = new Timestamp(new Date().getTime());
+        mask = String.valueOf(mask())/*UUID.randomUUID().toString()*/;
     }
 
     public boolean isPeer() {
@@ -129,9 +129,9 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         return Objects.hash(appName, mask);
     }
 
-    /*public int mask() {
-        String host = info.host();
-        int port = info.port();
+    public int mask() {
+        String host = getHost();
+        int port = port();
         return (host.hashCode() << 4) ^ portInterleaveHash(port);
     }
 
@@ -141,7 +141,7 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         int i2 = (port & 0x800) >> 9; // 1000 0000 0000 >> 9 = 1
         int i3 = (port & 0x8000) >> 12; // 1000 0000 0000 0000 >> 12 = 1
         return i | i1 | i2 | i3;
-    }*/
+    }
 
     @Override
     protected Object clone() throws CloneNotSupportedException {
@@ -158,6 +158,9 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
     @SneakyThrows
     @Override
     public String toString() {
-        return JSONUtil.writeValue(this);
+        return "service provider: " +
+                "appName<" + appName + ">, " +
+                "mask<" + mask + ">, " +
+                "info<" + host + ", " + port + ", " + lastRenewStamp + ">";
     }
 }
