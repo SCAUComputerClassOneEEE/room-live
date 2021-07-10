@@ -16,10 +16,12 @@ import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutHandler;
+import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.LinkedList;
+import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -35,14 +37,13 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
 
     private static final Logger logger = LoggerFactory.getLogger(ApplicationClient.class);
 
-    private RegistryClient app;
+    private DiscoveryNodeProcess app;
 
     private static BlockingQueue<HttpTaskCarrierExecutor> mainQueue; // public level 1
-    private static BlockingQueue<HttpTaskCarrierExecutor> subQueue;
 
     private static final HttpTaskQueueConsumer runner = new HttpTaskQueueConsumer(); // 可以改成多个子执行器 list，麻烦。。。
 
-    public ApplicationClient(Application application, ApplicationBootConfig config) throws Exception {
+    public ApplicationClient(DiscoveryNodeProcess application, ApplicationBootConfig config) throws Exception {
         super(runner);
         init(application, config);
     }
@@ -51,12 +52,11 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
     protected void init(Application application, ApplicationBootConfig config) throws Exception {
         if (this.isAlive()) return;
 
-        if (application instanceof DiscoveryNodeProcess) {
-            app = (DiscoveryNodeProcess) application;
-        } else {
-            throw new Exception("Client application thread init error.");
-        }
+        int taskQueueMaxSize = config.getTaskQueueMaxSize();
+        int nextSize = config.getNextSize();
+        app = (DiscoveryNodeProcess) application;
         bootstrap = new Bootstrap();
+
         final Bootstrap boots = (Bootstrap)bootstrap;
         final Integer connectTimeOut = config.getConnectTimeOut();
         final Integer writeTimeOut = config.getWriteTimeOut();
@@ -71,15 +71,14 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
                         socketChannel.pipeline()
                                 .addLast(new ReadTimeoutHandler(readTimeOut, TimeUnit.MILLISECONDS)) // read time out 5000ms
                                 .addLast(new HttpClientCodec())
-//                                .addLast(new HttpObjectAggregator(maxContentLength))
+                                .addLast(new HttpObjectAggregator(maxContentLength))
                                 .addLast(new HttpClientInBoundHandler(app))
                                 .addLast(new HttpClientOutBoundHandler(app));
                     }
                 });
 
-        mainQueue = new LinkedBlockingQueue<>(config.getTaskQueueMaxSize());
-        subQueue = new LinkedBlockingQueue<>(config.getNextSize());
-        runner.init(mainQueue, subQueue,
+        mainQueue = new LinkedBlockingQueue<>(taskQueueMaxSize);
+        runner.init(mainQueue, nextSize,
                 config.getMaxTolerateTimeMills(),
                 config.getHeartBeatIntervals(),
                 app);
@@ -90,69 +89,56 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
 //        runner.interrupt();
         super.stopThread();
         mainQueue.clear();
-        subQueue.clear();
     }
 
     public void subTask(HttpTaskCarrierExecutor executor) throws Exception {
         if (!this.isAlive())
             throw new Exception("Client thread was interrupted.");
-        do {
-            if (mainQueue.add(executor)) {
-                logger.debug(executor.getTaskId() + " queue subTask successfully.");
-                break;
-            }
-        } while (true);
+        mainQueue.put(executor);
     }
 
     protected static class HttpTaskQueueConsumer implements Runnable{
-        static BlockingQueue<HttpTaskCarrierExecutor> taskQueue;
+        static Queue<HttpTaskCarrierExecutor> taskQueue;
         static final HttpTaskExecutorPool pool = HttpTaskExecutorPool.getInstance();
-        RegistryClient client;
+        DiscoveryNodeProcess client;
         Thread thread;
 
         int maxTolerateTimeMills; // 最大的等待第二队列时间
         int heartBeatIntervals;
 
-        BlockingQueue<HttpTaskCarrierExecutor> selfNextTaskQueue;
+        Queue<HttpTaskCarrierExecutor> selfNextTaskQueue;
+        int subQueueSize;
 
+        @SneakyThrows
         @Override
         public void run() {
             thread = Thread.currentThread();
             long lastDoPacket = System.currentTimeMillis();
-            long lastRenewStamp = System.currentTimeMillis();
-            while (true) {
-                try {
-//                    logger.info("waiting if queue has any task.");
-                    HttpTaskCarrierExecutor take = taskQueue.poll(); // 阻塞
-                    // thread pool submit to do
-                    if (take != null && !selfNextTaskQueue.offer(take)) { // 非阻塞
-                        // 满了
-                        //logger.debug("doPacket selfNextTaskQueue is full.");
-                        doPacket();
-                        lastDoPacket = System.currentTimeMillis();
-                    }
-                    if (System.currentTimeMillis() - lastDoPacket >= maxTolerateTimeMills) {
-                        // 时间到了
-                        //logger.debug("doPacket maxTolerateTimeMills is full.");
-                        doPacket();
-                        lastDoPacket = System.currentTimeMillis();
-                    }
-
-                    if (System.currentTimeMillis() - lastRenewStamp >= heartBeatIntervals) {
-                        client.renew(client.getMyself(), false, client.getMyself().isPeer(), false); // 心跳
-                        lastRenewStamp = System.currentTimeMillis();
-                    }
-                } catch (Exception e) {
-                    // thread interrupt, and while break out
-                    break;
+            while (!client.isStop()) {
+                long cycleStart = System.currentTimeMillis();
+                client.renew(client.getMyself(), false, client.getMyself().isPeer(), false); // 心跳
+                if (cycleStart - lastDoPacket >= maxTolerateTimeMills
+                        && !selfNextTaskQueue.isEmpty()) {
+                    // 时间到了，而且有任务
+                    doPacket();
                 }
+                HttpTaskCarrierExecutor take = taskQueue.peek();
+                if (take != null && selfNextTaskQueue.size() < subQueueSize) { // 非阻塞
+                    // 满了
+                    doPacket();
+                    taskQueue.poll();
+                }
+                long cycleEnd = System.currentTimeMillis();
+                lastDoPacket = cycleEnd;
+                Thread.sleep(heartBeatIntervals -
+                        (cycleEnd - cycleStart));
             }
         }
 
-        void doPacket() throws InterruptedException {
+        void doPacket() {
             LinkedList<HttpTaskCarrierExecutor> httpTaskCarrierExecutors = new LinkedList<>();
             while (!selfNextTaskQueue.isEmpty()) {
-                httpTaskCarrierExecutors.add(selfNextTaskQueue.take());
+                httpTaskCarrierExecutors.add(selfNextTaskQueue.poll());
             }
             if (httpTaskCarrierExecutors.size() == 0) {
                 return;
@@ -163,16 +149,15 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             });
         }
 
-        void init(BlockingQueue<HttpTaskCarrierExecutor> mainQueue,
-                  BlockingQueue<HttpTaskCarrierExecutor> subQueue,
-                  int mTT,
-                  int hbI,
-                  RegistryClient app) {
+        void init(Queue<HttpTaskCarrierExecutor> mainQueue,
+                  int sQS, int mTT, int hbI,
+                  DiscoveryNodeProcess app) {
             client = app;
             heartBeatIntervals = hbI;
             taskQueue = mainQueue;
             maxTolerateTimeMills = mTT;
-            selfNextTaskQueue = subQueue;
+            selfNextTaskQueue = new LinkedList<>();
+            subQueueSize = sQS;
         }
 //
 //    public void interrupt() {

@@ -196,7 +196,6 @@ public class HttpTaskCarrierExecutor {
     *                        channel inactive --> SUCCESS           --> syncSuccess
     * */
     protected void success(FullHttpResponse result) {
-        logger.info(taskId + " success");
         endExec = System.currentTimeMillis();
         provider.fixAccessAvg(endExec - startExec);
         provider.decrementConnectingInt();
@@ -205,7 +204,6 @@ public class HttpTaskCarrierExecutor {
     }
 
     protected void fail(ResultType type, Throwable cause) {
-        logger.info(taskId + " fail because of " + type.name()+ ": " + cause.getMessage());
         cause.printStackTrace();
         endExec = System.currentTimeMillis();
         provider.fixAccessAvg(endExec - startExec);
@@ -219,7 +217,6 @@ public class HttpTaskCarrierExecutor {
             startExec = System.currentTimeMillis();
             provider.incrementConnectingInt();
             // connect
-            logger.debug(taskId + " Try to connect with " + provider);
             ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getHost(), provider.port()).sync();
             if (!sync.isSuccess()) {
                 /*connect time out */
@@ -268,10 +265,8 @@ public class HttpTaskCarrierExecutor {
     }
 
     public void sync() throws InterruptedException {
-        logger.debug(taskId + " executor's lock wait.");
         synchronized (lock) {
             lock.wait(); // 阻塞等待done Runnable的任务结束，这时候syncer可能为null
-            logger.debug(taskId + " executor's lock notify successfully.");
         }
     }
 

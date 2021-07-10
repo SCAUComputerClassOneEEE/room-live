@@ -1,33 +1,21 @@
 package com.example.register.trans.server;
 
 import com.example.register.process.NameCenterPeerProcess;
-import com.example.register.process.RegistryClient;
-import com.example.register.process.RegistryServer;
 import com.example.register.serviceInfo.ServiceProvider;
-import com.example.register.trans.client.ResultType;
 import com.example.register.utils.JSONUtil;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import io.netty.util.CharsetUtil;
 import io.netty.util.internal.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
-import java.sql.SQLOutput;
-import java.sql.Timestamp;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -44,7 +32,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     protected void channelRead0(ChannelHandlerContext cxt, FullHttpRequest request) throws Exception {
-        logger.debug("Read:\n" + request);
         try {
             if (!app.isRunning()) {
                 throw new RuntimeException("server thread end.");
@@ -71,7 +58,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     private void getMethod(ChannelHandlerContext cxt, FullHttpRequest request) throws Exception {
         String uri = request.uri();
-        logger.info("get one FullHttpRequest" + uri);
         if (StringUtil.isNullOrEmpty(uri)){
             throw new RuntimeException("uri is null.");
         }
@@ -92,10 +78,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     }
 
     public void postMethod(ChannelHandlerContext cxt, FullHttpRequest request) throws Exception {
-        /*
-        * 如果请求头里有PEER_REPLICATION，不再调用replicate
-        * callByPeer = true, secondPeer = true
-        * */
+        /* 如果请求头里有PEER_REPLICATION，不再调用replicate
+        * callByPeer = true, secondPeer = true*/
         String replication = request.headers().get("REPLICATION");
         if (StringUtil.isNullOrEmpty(replication)) {
             throw new RuntimeException("replication header is empty");
@@ -108,17 +92,18 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         if (!uri.equals("/antiReplication")) {
             serviceProvider = JSONUtil.readValue(content, ServiceProvider.class);
         }
-        logger.info("post one FullHttpRequest " + uri);
         switch (uri) {
-            case "/register" :      app.register(serviceProvider, false, true, secondPeer);
+            case "/register" :      app.register(serviceProvider,
+                                false, true, secondPeer);
                                     break;
-            case "/renew" :         app.renew(serviceProvider, false, true, secondPeer);
+            case "/renew" :         app.renew(serviceProvider,
+                                false, true, secondPeer);
                                     break;
-            case "/offline" :       app.offline(serviceProvider, false, true, secondPeer);
+            case "/offline" :       app.offline(serviceProvider,
+                                false, true, secondPeer);
                                     break;
-            case "/antiReplicate" : app.discover(
-                                        new ServiceProvider("", address.getHostName(), address.getPort()),
-                                        content, false);
+            case "/antiReplicate" : app.discover(new ServiceProvider("",
+                    address.getHostName(), address.getPort()), content, false);
                                     break;
             default:throw new RuntimeException("uri is invalid.");
         }
@@ -133,15 +118,15 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1,
                 status,
                 Unpooled.copiedBuffer(c, CharsetUtil.UTF_8));
-        logger.debug("response: " + status);
         response.headers().add("taskId", taskId);
         cxt.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         HttpResponseStatus error;
         logger.debug("exceptionCaught:" + cause.getMessage());
+        cause.printStackTrace();
         if (cause instanceof WriteTimeoutException) {
             error = HttpResponseStatus.NO_CONTENT;
         } else {

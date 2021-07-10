@@ -27,7 +27,6 @@ public abstract class ProcessedRunnable implements Runnable {
         }
         synchronized (process.getLock()) {
             process.getLock().notify();
-            logger.debug(process.getTaskId() + " executor's lock notify");
         }
     }
 

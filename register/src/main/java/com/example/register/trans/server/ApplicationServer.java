@@ -59,7 +59,8 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
 //                            timerTaskScan(app);
 //                        }
 //                    }, heartBeatIntervals);
-                    while (true) {
+                    while (!server.app.isStop()) {
+                        /*before sleep*/
                         long s = System.currentTimeMillis();
                         timerTaskScan(app);
                         long e = System.currentTimeMillis();

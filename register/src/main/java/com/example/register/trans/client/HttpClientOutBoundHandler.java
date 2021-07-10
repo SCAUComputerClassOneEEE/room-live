@@ -35,13 +35,11 @@ public class HttpClientOutBoundHandler extends ChannelOutboundHandlerAdapter {
         if (msg instanceof FullHttpRequest) {
             FullHttpRequest msg1 = (FullHttpRequest) msg;
             String taskIdUUID = msg1.headers().get("taskId");
-            logger.debug("Try to write:\n" + msg1);
             if (StringUtil.isNullOrEmpty(taskIdUUID)) {
                 HttpTaskExecutorPool.taskMap.get(taskIdUUID)
                         .fail(ResultType.RUNTIME_EXCEPTION, new RuntimeException("no taskId"));
                 ctx.channel().closeFuture().sync();
             } else {
-
                 ctx.channel().attr(taskId).set(taskIdUUID);
                 ctx.writeAndFlush(msg1, promise).sync();
             }

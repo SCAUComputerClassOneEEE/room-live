@@ -78,6 +78,9 @@ public class DiscoveryNodeProcess implements RegistryClient{
     protected static ServiceApplicationsTable table;
     protected ApplicationClient client;
     protected ServiceProvider mySelf;
+    protected volatile boolean stop;
+
+    public boolean isStop() { return stop; }
 
     public DiscoveryNodeProcess(ApplicationBootConfig config) throws Exception {
         this.init(config);
@@ -110,6 +113,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
 
     @Override
     public void stop() throws Exception {
+        stop = true;
         offline(mySelf,true, false, false);
         client.stopThread();
     }
