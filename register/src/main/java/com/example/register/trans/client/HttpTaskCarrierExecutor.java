@@ -217,7 +217,7 @@ public class HttpTaskCarrierExecutor {
             startExec = System.currentTimeMillis();
             provider.incrementConnectingInt();
             // connect
-            ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getHost(), provider.port()).sync();
+            ChannelFuture sync = ((Bootstrap)client.getBootstrap()).connect(provider.getHost(), provider.getPort()).sync();
             if (!sync.isSuccess()) {
                 /*connect time out */
                 fail(ResultType.CONNECT_TIME_OUT, new Exception("Connect TIMEOUT with" + provider.toString()));

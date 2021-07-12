@@ -12,9 +12,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.handler.timeout.WriteTimeoutHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,84 +28,22 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
     private static final Logger logger = LoggerFactory.getLogger(ApplicationServer.class);
 
     private NameCenterPeerProcess app;
-    private final EventLoopGroup boosGroup = new NioEventLoopGroup(1);
+    private final EventLoopGroup boosGroup;
 
     private static final ServerScanRunnable runnable = new ServerScanRunnable();
 
-    protected static class ServerScanRunnable implements Runnable{
-        ApplicationServer server;
-        int heartBeatIntervals;
-
-        void init(ApplicationServer server, int heartBeatIntervals) {
-            this.server = server;
-            this.heartBeatIntervals = heartBeatIntervals;
-        }
-
-        @Override
-        public void run() {
-            final ServerBootstrap bootstrap = (ServerBootstrap) server.bootstrap;
-            NameCenterPeerProcess app = server.app;
-            try {
-                ChannelFuture bind = bootstrap.bind().sync();
-                logger.info("server bind " + bootstrap.config().localAddress().toString() + " " + bind.isSuccess());
-                if (bind.isSuccess()) {
-//                    timerTaskScan(app);
-//                    Timer timer = new Timer();
-//                    timer.schedule(new TimerTask() {
-//                        @Override
-//                        public void run() {
-//                            timerTaskScan(app);
-//                        }
-//                    }, heartBeatIntervals);
-                    while (!server.app.isStop()) {
-                        /*before sleep*/
-                        long s = System.currentTimeMillis();
-                        timerTaskScan(app);
-                        long e = System.currentTimeMillis();
-                        Thread.sleep(heartBeatIntervals - (e-s));
-                    }
-                } else {
-                    server.stopThread();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                logger.error("server runnable error: " + e.getMessage());
-            } finally {
-                logger.info("server end");
-                server.stopThread();
-            }
-
-        }
-
-        void timerTaskScan(NameCenterPeerProcess server) {
-//            logger.debug("time to scan table.");
-            Map<String, Set<ServiceProvider>> noBeatMap = server.scan();
-
-            noBeatMap.forEach((appName, apps)->{
-                for (ServiceProvider app : apps) {
-                    if (app.getMask().equals(server.getMyself().getMask())) continue;
-                    logger.debug("have no new heat " + app);
-                    server.offline(app, false, true, false);
-                }
-            });
-        }
-    }
-
-    public ApplicationServer(Application application, ApplicationBootConfig config) throws Exception {
-        super(runnable);
+    public ApplicationServer(Application application, ApplicationBootConfig config) {
+        super(runnable, config.getWorkerNThread());
+        boosGroup = new NioEventLoopGroup(config.getBossNThread());
         runnable.init(this, config.getHeartBeatIntervals());
         init(application, config);
     }
 
     @Override
-    protected void init(Application application, ApplicationBootConfig config) throws Exception {
+    protected void init(Application application, ApplicationBootConfig config) {
         if (this.isAlive()) return;
 
-        if (application instanceof NameCenterPeerProcess) {
-            app = (NameCenterPeerProcess) application;
-        } else {
-            throw new Exception("server application thread init error.");
-        }
+        app = (NameCenterPeerProcess) application;
         bootstrap = new ServerBootstrap();
         final Integer writeTimeOut = config.getWriteTimeOut();
         final Integer readTimeOut = config.getReadTimeOut();
@@ -137,4 +73,54 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
         if (!boosGroup.isTerminated())
             boosGroup.shutdownGracefully();
     }
+
+    protected static class ServerScanRunnable implements Runnable{
+        ApplicationServer server;
+        int heartBeatIntervals;
+
+        void init(ApplicationServer server, int heartBeatIntervals) {
+            this.server = server;
+            this.heartBeatIntervals = heartBeatIntervals;
+        }
+
+        @Override
+        public void run() {
+            final ServerBootstrap bootstrap = (ServerBootstrap) server.bootstrap;
+            NameCenterPeerProcess app = server.app;
+            try {
+                ChannelFuture bind = bootstrap.bind().sync();
+                server.future = bind;
+                logger.info("server bind " + bootstrap.config().localAddress().toString() + " " + bind.isSuccess());
+                if (bind.isSuccess()) {
+                    while (server.app.flagForStop()) {
+                        /*before sleep*/
+                        long s = System.currentTimeMillis();
+                        timerTaskScan(app);
+                        long e = System.currentTimeMillis();
+                        Thread.sleep(heartBeatIntervals - (e-s));
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                logger.error("server runnable error: " + e.getMessage());
+            } finally {
+                logger.info("server end");
+                server.stopThread();
+            }
+
+        }
+
+        void timerTaskScan(NameCenterPeerProcess server) {
+            Map<String, Set<ServiceProvider>> noBeatMap = server.scan();
+
+            noBeatMap.forEach((appName, apps)->{
+                for (ServiceProvider app : apps) {
+                    if (app.getMask().equals(server.getMyself().getMask())) continue;
+                    logger.debug("have no new heat " + app);
+                    server.offline(app, false, true, false);
+                }
+            });
+        }
+    }
+
 }

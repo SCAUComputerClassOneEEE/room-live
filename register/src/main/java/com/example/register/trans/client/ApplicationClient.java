@@ -2,20 +2,16 @@ package com.example.register.trans.client;
 
 import com.example.register.process.Application;
 import com.example.register.process.DiscoveryNodeProcess;
-import com.example.register.process.RegistryClient;
 import com.example.register.process.ApplicationBootConfig;
 import com.example.register.trans.ApplicationThread;
 import com.example.register.utils.HttpTaskExecutorPool;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.handler.timeout.WriteTimeoutHandler;
 import lombok.SneakyThrows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,13 +39,13 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
 
     private static final HttpTaskQueueConsumer runner = new HttpTaskQueueConsumer(); // 可以改成多个子执行器 list，麻烦。。。
 
-    public ApplicationClient(DiscoveryNodeProcess application, ApplicationBootConfig config) throws Exception {
-        super(runner);
+    public ApplicationClient(DiscoveryNodeProcess application, ApplicationBootConfig config) {
+        super(runner, config.getWorkerNThread());
         init(application, config);
     }
 
     @Override
-    protected void init(Application application, ApplicationBootConfig config) throws Exception {
+    protected void init(Application application, ApplicationBootConfig config) {
         if (this.isAlive()) return;
 
         int taskQueueMaxSize = config.getTaskQueueMaxSize();
@@ -114,7 +110,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
         public void run() {
             thread = Thread.currentThread();
             long lastDoPacket = System.currentTimeMillis();
-            while (!client.isStop()) {
+            while (client.flagForStop()) {
                 long cycleStart = System.currentTimeMillis();
                 client.renew(client.getMyself(), false, client.getMyself().isPeer(), false); // 心跳
                 if (cycleStart - lastDoPacket >= maxTolerateTimeMills

@@ -10,12 +10,13 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 
 public abstract class ApplicationThread<B extends AbstractBootstrap<B, C>, C extends Channel> extends Thread {
-    protected static final EventLoopGroup workerGroup = new NioEventLoopGroup(1);
+    protected static EventLoopGroup workerGroup;
     protected AbstractBootstrap<B, C> bootstrap;
     protected ChannelFuture future;
 
-    public ApplicationThread(Runnable runnable) {
+    public ApplicationThread(Runnable runnable, int workerNThread) {
         super(runnable);
+        workerGroup = new NioEventLoopGroup(workerNThread);
     }
     protected abstract void init(Application application, ApplicationBootConfig config) throws Exception;
     public void stopThread() {

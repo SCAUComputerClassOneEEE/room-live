@@ -7,19 +7,12 @@ import com.example.register.trans.client.ApplicationClient;
 import com.example.register.trans.client.HttpTaskCarrierExecutor;
 import com.example.register.trans.client.ProcessedRunnable;
 import com.example.register.trans.client.ResultType;
-import com.example.register.utils.HttpTaskExecutorPool;
 import com.example.register.utils.JSONUtil;
-import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 
@@ -80,13 +73,9 @@ public class DiscoveryNodeProcess implements RegistryClient{
     protected ServiceProvider mySelf;
     protected volatile boolean stop;
 
-    public boolean isStop() { return stop; }
+    public boolean flagForStop() { return !stop; }
 
-    public DiscoveryNodeProcess(ApplicationBootConfig config) throws Exception {
-        this.init(config);
-    }
-
-    protected void init(ApplicationBootConfig config) throws Exception {
+    public DiscoveryNodeProcess(ApplicationBootConfig config) {
         mySelf = config.getSelfNode();
         // initialize the table with config and myself
         try {
@@ -98,21 +87,21 @@ public class DiscoveryNodeProcess implements RegistryClient{
             logger.error("DiscoveryNodeProcess boot error" + e.getMessage());
             throw e;
         }
-        /*
-        * register myself
-        * */
-        if (!mySelf.isPeer())
-            register(config.getSelfNode(),true, false, false);
-        logger.info("client register to " + (mySelf.isPeer() ? "echo peer" : "first peer"));
     }
 
     @Override
     public void start() {
-
+        /*
+         * register myself
+         * */
+        stop = false;
+        /*register(mySelf,true, false, false);
+        logger.info("client register to " + (mySelf.isPeer() ? "echo peer" : "first peer"));*/
     }
 
     @Override
     public void stop() throws Exception {
+        if (stop) return;
         stop = true;
         offline(mySelf,true, false, false);
         client.stopThread();
@@ -123,20 +112,11 @@ public class DiscoveryNodeProcess implements RegistryClient{
         return client.isAlive();
     }
 
-    /**
-     * 阻塞
-     *
+    /* 阻塞
      * 把自身注册到peer
      * 如果返回非2XX
      * table删除该peer，重新调用register
-     *
-     * 最后修改myPeer, otherPeers
-     *
-     * setup callByPeer secondPeer
-     *     1          f          f // node 出发
-     *     2          t          f // peer 出发
-     *     3          t          t // 结束广播
-     * */
+     * 最后修改myPeer, otherPeers*/
     @Override
     public final void register(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) {
         if (who == null) {
@@ -165,16 +145,14 @@ public class DiscoveryNodeProcess implements RegistryClient{
                 replicate(who, ReplicationAction.OFFLINE, sync, callByPeer);
         } catch (Exception e) {
             logger.error("when offline " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
-    /**
-     * 非阻塞
-     *
+    /* 非阻塞
      * 发送心跳报文到myPeer
      * 收到404，调用register到myPeer
-     * 收到500，调用register到otherPeers，table删除该peer
-     * */
+     * 收到500，调用register到otherPeers，table删除该peer*/
     @Override
     public final void renew(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播， 第三次调用*/) {
         if (who == null) {
@@ -192,11 +170,18 @@ public class DiscoveryNodeProcess implements RegistryClient{
     }
 
     @Override
-    public final void discover(ServiceProvider peer, String appNames, boolean sync) throws Exception {
+    public final void discover(ServiceProvider peer, String appNames, boolean sync,
+                               Collection<ServiceProvider> exclude/*排除没有该资源的*/) throws Exception {
         if (peer == null) {
-            peer = table.getOptimalServer();
+            if (exclude == null)
+                exclude = new HashSet<>();
+            peer = table.getOptimalServer(exclude);
         }
-        final ServiceProvider _peer = peer;
+        if (peer == null) {
+            throw new NullPointerException("table any more server(" + appNames + ") for discovering.");
+        }
+        final Collection<ServiceProvider> _exclude = exclude;
+        final ServiceProvider myConPeer = peer;
         HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                 .byClient(client)
                 .access(HttpMethod.GET, "/discover")
@@ -212,25 +197,23 @@ public class DiscoveryNodeProcess implements RegistryClient{
                             Map<String, Set<ServiceProvider>> newerSet = table.compareAndReturnUpdate(serviceProviders);
                             // replicate newerSet
                             StringBuilder newAppNames = new StringBuilder();
-                            newerSet.forEach((s, serviceProviders1) -> newAppNames.append("s"));
+                            newerSet.forEach((s, serviceProviders1) -> newAppNames.append(s));
                             newAppNames.deleteCharAt(newAppNames.length() - 1);
-                            antiReplicate(_peer, newAppNames.toString(), false);
+                            antiReplicate(myConPeer, newAppNames.toString(), false);
                         } else if (status.equals(HttpResponseStatus.SEE_OTHER)) {
                             // --> 303 不存在该类数据（对于discover该资源还没有注册，或者已经下线），对方希望请求别的peer
-                            /*
-                             *选择最优的 server
-                             */
-                            discover(null, appNames, sync);
+                            /*选择最优的 server*/
+                            _exclude.add(myConPeer);
+                            discover(null, appNames, sync, _exclude);
                         } else {
-                            // --> 500 服务器异常，重新register到别的peer，再进行discover
-                            offline(_peer, false, false, false);
-                            discover(null, appNames, sync);
+                            table.removeApp(myConPeer);
+                            discover(null, appNames, sync, _exclude);
                         }
                     }
 
                     @Override
                     public void failAndThen(ResultType errorType, String resultString) {
-                        table.removeApp(_peer);
+                        table.removeApp(myConPeer);
                     }
                 }).withBody(appNames).create();
         /*block to sub taskQueue*/
@@ -241,6 +224,13 @@ public class DiscoveryNodeProcess implements RegistryClient{
         }
     }
 
+    /*
+     *
+     * setup callByPeer secondPeer
+     *     1          f          f // node 出发
+     *     2          t          f // peer 广播
+     *     3          t          t // 结束广播
+     * */
     @Override
     public final void replicate(ServiceProvider carryNode,
                           ReplicationAction action,
@@ -248,7 +238,10 @@ public class DiscoveryNodeProcess implements RegistryClient{
         String body = JSONUtil.writeValue(carryNode);
         List<HttpTaskCarrierExecutor> executors = new LinkedList<>();
         List<ServiceProvider> myPeerTemp = new LinkedList<>();
-        myPeerTemp.add(table.getOptimalServer());
+        ServiceProvider optimalServer = table.getOptimalServer(null);
+        if (optimalServer == null)
+            throw new NullPointerException("table any more server(default server) for replicating.");
+        myPeerTemp.add(optimalServer);
         /* if the replication call by a peer, // comeFromPeer = true
         * it need broadcast this action;
         * else just to myPeer. // comeFromPeer = false*/
@@ -268,15 +261,21 @@ public class DiscoveryNodeProcess implements RegistryClient{
                         .addHeader("content-length", body.getBytes().length)
                         .done(new ProcessedRunnable() {
                             @Override
-                            public void failAndThen(ResultType errorType, String resultString) {
-                                offline(myConPeer, false, callByPeer, false);
+                            public void failAndThen(ResultType errorType, String resultString) throws Exception {
+                                if (callByPeer) {
+                                    offline(myConPeer, false, true, false);
+                                    return;
+                                }
+                                table.removeApp(myConPeer);
+                                /* 如果是client的同步操作需要再同步尝试 */
+                                replicate(carryNode, action, sync, false);
                             }
                         }).withBody(body).create();
                 /*block to sub taskQueue*/
                 executor.sub();
                 executors.add(executor);
             }
-//            servers.remove();
+            servers.remove();
         }
         /*wait until executor's doneRunnable end*/
         if (sync)

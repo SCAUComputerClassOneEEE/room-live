@@ -2,8 +2,10 @@ package com.example.register.process;
 
 import com.example.register.process.RegistryServer;
 import com.example.register.serviceInfo.ServiceProvider;
+import com.example.register.spring.RegisterProperties;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +17,9 @@ public class ApplicationBootConfig {
 
     private RegistryServer.ClusterType serverClusterType;
 
+    /*thread*/
+    private int workerNThread;
+    private int bossNThread;
     /*
     * client
     * */
@@ -35,6 +40,54 @@ public class ApplicationBootConfig {
     private int backLog;
 
     private Comparator<ServiceProvider> tableSetRankComparator;
+
+    public ApplicationBootConfig() { }
+
+    public ApplicationBootConfig(RegisterProperties properties) {
+        RegisterProperties.Address self = properties.getSelf();
+        selfNode = new ServiceProvider(self.getAppName(), self.getHost(), self.getPort());
+        othersPeerServerNodes = new HashMap<>();
+        List<RegisterProperties.Address> servers = properties.getPeers();
+        for (RegisterProperties.Address peer : servers) {
+            String appName = peer.getAppName();
+            String host = peer.getHost();
+            int port = peer.getPort();
+            othersPeerServerNodes.put(appName, new ServiceProvider(appName, host, port));
+        }
+        serverClusterType = othersPeerServerNodes.size() > 1 ?
+                RegistryServer.ClusterType.P2P : RegistryServer.ClusterType.SINGLE;
+
+        workerNThread = properties.getWorkerNThread();
+        bossNThread = properties.getBossNThread();
+
+        taskQueueMaxSize = properties.getTaskQueueMaxSize();
+        nextSize = properties.getNextQueueSize();
+        connectTimeOut = properties.getConnectTimeOut();
+        readTimeOut = properties.getReadTimeOut();
+        maxTolerateTimeMills = properties.getMaxTolerateTimeMills();
+        heartBeatIntervals = properties.getHeartBeatIntervals();
+
+        writeTimeOut = properties.getWriteTimeOut();
+        serverPort = properties.getServerPort();
+        maxContentLength = properties.getMaxContentLength();
+        backLog = properties.getBackLog();
+    }
+
+    public int getWorkerNThread() {
+        return workerNThread;
+    }
+
+    public void setWorkerNThread(int workerNThread) {
+        this.workerNThread = workerNThread;
+    }
+
+    public int getBossNThread() {
+        return bossNThread;
+    }
+
+    public void setBossNThread(int bossNThread) {
+        this.bossNThread = bossNThread;
+    }
 
     public int getBackLog() { return backLog; }
 

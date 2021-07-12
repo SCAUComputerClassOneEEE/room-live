@@ -56,7 +56,7 @@ public class ServiceApplicationsTable {
     * */
     private final ConcurrentHashMap<String, ConcurrentHashMap<String, ServiceProvider>> doubleMarkMap;
 
-    public ServiceApplicationsTable(ApplicationBootConfig config/*初始化时候的服务列表*/) throws Exception {
+    public ServiceApplicationsTable(ApplicationBootConfig config/*初始化时候的服务列表*/) {
         doubleMarkMap = new ConcurrentHashMap<>();
         ServiceProvider selfNode = config.getSelfNode();
         ConcurrentHashMap<String,ServiceProvider> selfSet = new ConcurrentHashMap<>();
@@ -65,10 +65,10 @@ public class ServiceApplicationsTable {
 
         ConcurrentHashMap<String,ServiceProvider> othersSet;
         Map<String, ServiceProvider> othersPeerServerNodes = config.getOthersPeerServerNodes();
-        if (othersPeerServerNodes != null && othersPeerServerNodes.size() != 0)
+        if (othersPeerServerNodes != null && othersPeerServerNodes.size() != 0) {
             othersSet = new ConcurrentHashMap<>(othersPeerServerNodes);
-        else throw new Exception("Other peers set is null or empty");
-        doubleMarkMap.put(SERVER_PEER_NODE, othersSet);
+            doubleMarkMap.put(SERVER_PEER_NODE, othersSet);
+        }
     }
 
     public void removeApps(String appName) {
@@ -132,19 +132,21 @@ public class ServiceApplicationsTable {
         return doubleMarkMap.get(appName).size() > 0;
     }
 
-    public ServiceProvider getOptimalServer() {
-        return getOptimal(SERVER_PEER_NODE);
+    public ServiceProvider getOptimalServer(Collection<ServiceProvider> exclude) {
+        return getOptimal(SERVER_PEER_NODE, exclude);
     }
 
     /**
      *
      * 选择最优的serviceProvider
      */
-    public ServiceProvider getOptimal(String appName) {
+    public ServiceProvider getOptimal(String appName, Collection<ServiceProvider> exclude) {
         Set<ServiceProvider> appsAsSet = getAppsAsSet(appName);
         if (appsAsSet.size() == 0)
             return null;
-        Object[] objects = appsAsSet.stream().sorted(new FastestResponseComparator()).distinct().toArray();
+        Object[] objects = appsAsSet.stream()
+                .filter(e->!exclude.contains(e))
+                .sorted(new FastestResponseComparator()).distinct().toArray();
         return (ServiceProvider)objects[0];
     }
 
@@ -169,7 +171,7 @@ public class ServiceApplicationsTable {
         return set;
     }
 
-    public Set<ServiceProvider> getAppsAsClonedSet(String appName) throws CloneNotSupportedException {
+    /*public Set<ServiceProvider> getAppsAsClonedSet(String appName) throws CloneNotSupportedException {
         final Set<ServiceProvider> asList = getAppsAsSet(appName);
         Set<ServiceProvider> rls = new HashSet<>();
 
@@ -177,7 +179,7 @@ public class ServiceApplicationsTable {
             rls.add((ServiceProvider)r.clone());
         }
         return rls;
-    }
+    }*/
 
     public ServiceProvider getApp(String appName, String mask) {
         ServiceProvider rSP;

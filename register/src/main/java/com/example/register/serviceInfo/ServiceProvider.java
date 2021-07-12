@@ -4,29 +4,35 @@ package com.example.register.serviceInfo;
 import com.example.register.utils.JSONUtil;
 import com.google.common.util.concurrent.AtomicDouble;
 import lombok.SneakyThrows;
+import lombok.ToString;
 
 import java.io.Serializable;
 import java.sql.Timestamp;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ServiceProvider implements Serializable, Cloneable, Comparable<ServiceProvider>, Coverable<ServiceProvider> {
+@ToString
+public class ServiceProvider implements Serializable, Comparable<ServiceProvider>, Coverable<ServiceProvider> {
 
+    // register instance info
     private String appName;
-    private String mask;
     private String host;
     private int port;
+    private final List<MethodInstance> methodMappingList;
 
-    private transient Timestamp lastRenewStamp;
-    private AtomicInteger connectingInt; // 正在连接数
-    private AtomicInteger historyInt; // 历史连接数
-    private AtomicDouble avgAccess; // 平均响应时间
+    private final String mask;
+    private Timestamp lastRenewStamp;
+    private final AtomicInteger connectingInt; // 正在连接数
+    private final AtomicInteger historyInt; // 历史连接数
+    private final AtomicDouble avgAccess; // 平均响应时间
 
     public ServiceProvider() {
         lastRenewStamp = new Timestamp(new Date().getTime());
+        connectingInt = new AtomicInteger(0);
+        historyInt = new AtomicInteger(0);
+        avgAccess = new AtomicDouble(0.0);
+        mask = String.valueOf(mask())/*UUID.randomUUID().toString()*/;
+        methodMappingList = new LinkedList<>();
     }
 
     public ServiceProvider(String appName, String host, int port) {
@@ -38,6 +44,36 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         avgAccess = new AtomicDouble(0.0);
         lastRenewStamp = new Timestamp(new Date().getTime());
         mask = String.valueOf(mask())/*UUID.randomUUID().toString()*/;
+        methodMappingList = new LinkedList<>();
+    }
+
+    public void addMethod(MethodInstance m) {
+        methodMappingList.add(m);
+    }
+
+    public void removeMethod(String name) {
+        if (name == null || name.equals("")) return;
+        for (MethodInstance methodInstance : methodMappingList) {
+            if (methodInstance.getName().equals(name)) {
+                return;
+            }
+        }
+    }
+
+    public List<MethodInstance> getMethodMappingList() {
+        return methodMappingList;
+    }
+
+    public AtomicInteger getHistoryInt() {
+        return historyInt;
+    }
+
+    public Timestamp getLastRenewStamp() {
+        return lastRenewStamp;
+    }
+
+    public void setLastRenewStamp(Timestamp lastRenewStamp) {
+        this.lastRenewStamp = lastRenewStamp;
     }
 
     public boolean isPeer() {
@@ -54,7 +90,7 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         return host;
     }
 
-    public int port() {
+    public int getPort() {
         return port;
     }
 
@@ -131,8 +167,8 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
 
     public int mask() {
         String host = getHost();
-        int port = port();
-        return (host.hashCode() << 4) ^ portInterleaveHash(port);
+        int port = getPort();
+        return Objects.hash(host, port);
     }
 
     private int portInterleaveHash(int port) {
@@ -141,26 +177,5 @@ public class ServiceProvider implements Serializable, Cloneable, Comparable<Serv
         int i2 = (port & 0x800) >> 9; // 1000 0000 0000 >> 9 = 1
         int i3 = (port & 0x8000) >> 12; // 1000 0000 0000 0000 >> 12 = 1
         return i | i1 | i2 | i3;
-    }
-
-    @Override
-    protected Object clone() throws CloneNotSupportedException {
-        ServiceProvider cSP = (ServiceProvider)super.clone();
-        cSP.mask = mask;
-        cSP.appName = appName;
-        cSP.lastRenewStamp = lastRenewStamp;
-        cSP.avgAccess = new AtomicDouble(avgAccess.doubleValue());
-        cSP.connectingInt = new AtomicInteger(connectingInt.get());
-        cSP.historyInt = new AtomicInteger(historyInt.get());
-        return cSP;
-    }
-
-    @SneakyThrows
-    @Override
-    public String toString() {
-        return "service provider: " +
-                "appName<" + appName + ">, " +
-                "mask<" + mask + ">, " +
-                "info<" + host + ", " + port + ", " + lastRenewStamp + ">";
     }
 }

@@ -103,7 +103,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                                 false, true, secondPeer);
                                     break;
             case "/antiReplicate" : app.discover(new ServiceProvider("",
-                    address.getHostName(), address.getPort()), content, false);
+                    address.getHostName(), address.getPort()), content, false, null);
                                     break;
             default:throw new RuntimeException("uri is invalid.");
         }

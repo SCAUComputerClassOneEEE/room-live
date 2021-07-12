@@ -23,7 +23,11 @@ public abstract class ProcessedRunnable implements Runnable {
                 logger.error("when HttpTaskCarrierExecutor execSuccess " + process.getTaskId() + " but " + e.getMessage());
             }
         } else {
-            failAndThen(process.getErrorType(), process.getResultString());
+            try {
+                failAndThen(process.getErrorType(), process.getResultString());
+            } catch (Exception e) {
+                logger.error("when HttpTaskCarrierExecutor execFail " + process.getTaskId() + " but " + e.getMessage());
+            }
         }
         synchronized (process.getLock()) {
             process.getLock().notify();
@@ -42,7 +46,7 @@ public abstract class ProcessedRunnable implements Runnable {
      * @param resultString HTTP 请求失败后的报错信息
      * @param errorType HTTP 请求失败的出错状态
      * */
-    public void failAndThen(ResultType errorType, String resultString) {
+    public void failAndThen(ResultType errorType, String resultString) throws Exception {
 
     }
 

@@ -3,6 +3,7 @@ package com.example.register.process;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -30,7 +31,7 @@ public interface RegistryClient extends Application, MethodNestable {
 
     void offline(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/);
     // get
-    void discover(ServiceProvider peer, String appName, boolean sync) throws Exception;
+    void discover(ServiceProvider peer, String appName, boolean sync, Collection<ServiceProvider> exclude) throws Exception;
 
     void replicate(ServiceProvider carryNode, ReplicationAction action, boolean sync, boolean comeFromPeer) throws Exception;
 

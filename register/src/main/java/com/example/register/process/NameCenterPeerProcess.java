@@ -31,68 +31,41 @@ import java.util.stream.Collectors;
 public class NameCenterPeerProcess extends DiscoveryNodeProcess implements RegistryServer {
 
     private static final Logger logger = LoggerFactory.getLogger(NameCenterPeerProcess.class);
-    private RegistryServer.ClusterType clusterType;
+    private final RegistryServer.ClusterType clusterType;
 
-    private ApplicationServer server;
-    private int heartBeatIntervals;
+    private final ApplicationServer server;
+    private final int heartBeatIntervals;
 
-    // 基础通信：client 和 server
-
-    // 注册表
-
-    public NameCenterPeerProcess(ApplicationBootConfig config) throws Exception {
+    public NameCenterPeerProcess(ApplicationBootConfig config) {
         super(config);
-        this.init0(config);
-    }
-
-    /**
-     *
-     * 初始化，启动数据的远端同步
-     * setup 0 从参数 config 中初始化 peers 列表
-     *      -
-     * setup 1 对peers列表的每一个peer发出isActive探测
-     *
-     * setup 2 对某一个 peer 发出全同步请求 syncAll() 阻塞，并更新到table中
-     *      -
-     * setup 2 把自己的 InstanceInfo 同步发送给每一个peer replicate()
-     *      -
-     * setup 3 准备对外服务
-     */
-    void init0(ApplicationBootConfig config) throws Exception {
-        if (config.getServerClusterType().equals(ClusterType.P2P)) {
-            syncAll(true);
-        }
         clusterType = config.getServerClusterType();
-        /*
-        *
-        * start server
-        * */
         server = new ApplicationServer(this, config);
         heartBeatIntervals = config.getHeartBeatIntervals();
-        logger.info("server init...");
+        if (config.getServerClusterType().equals(ClusterType.P2P)) {
+            try {
+                syncAll(true);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
-    /**
-     *
-     * 开启对外服务
-     *
-     */
+    /*开启对外服务*/
     @Override
     public void start() {
-        // only once
-        super.start();
+        /* start server */
+        stop = false;
         server.start();
         if (clusterType.equals(ClusterType.P2P))
             register(mySelf, false, true, false);
     }
 
-    /**
-     *
-     * 停止对外服务
-     */
     @Override
     public void stop() throws Exception {
-        super.stop();
+        if (stop) return;
+        stop = true;
+        offline(mySelf,true, true, false);
+        client.stopThread();
         server.stopThread();
     }
 
@@ -104,7 +77,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
             sb.append(app).append(",");
         }
         sb.deleteCharAt(sb.length() - 1);
-        discover(null, sb.toString(), sync);
+        discover(null, sb.toString(), sync, null);
     }
 
     @Override
