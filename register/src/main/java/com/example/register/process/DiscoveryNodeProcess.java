@@ -74,32 +74,31 @@ public class DiscoveryNodeProcess implements RegistryClient{
     protected static ServiceApplicationsTable table;
     protected ApplicationClient client;
     protected ServiceProvider mySelf;
-    protected volatile boolean stop;
+    protected volatile boolean stop = true;
+    protected volatile boolean initialized;
 
     public boolean flagForStop() { return !stop; }
 
     public DiscoveryNodeProcess(ApplicationBootConfig config) {
+        if (config == null) return;
         mySelf = config.getSelfNode();
         // initialize the table with config and myself
         try {
             table = new ServiceApplicationsTable(config);
             // initialize the client and server's thread worker for working.
             client = new ApplicationClient(this, config);
-            client.start();
         } catch (Exception e) {
             logger.error("DiscoveryNodeProcess boot error" + e.getMessage());
             throw e;
         }
+        initialized = true;
     }
 
     @Override
     public void start() {
-        /*
-         * register myself
-         * */
         stop = false;
-        /*register(mySelf,true, false, false);
-        logger.info("client register to " + (mySelf.isPeer() ? "echo peer" : "first peer"));*/
+        client.start();
+        register(null,true, mySelf.isPeer(), false);
     }
 
     @Override
@@ -122,6 +121,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
      * 最后修改myPeer, otherPeers*/
     @Override
     public final void register(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) {
+        if (stop) return;
         if (who == null) {
             who = mySelf;
         }
@@ -138,6 +138,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
 
     @Override
     public final void offline(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播*/) {
+        if (stop) return;
         if (who == null) {
             who = mySelf;
         }
@@ -158,6 +159,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
      * 收到500，调用register到otherPeers，table删除该peer*/
     @Override
     public final void renew(ServiceProvider who, boolean sync, boolean callByPeer, boolean secondPeer/*第二次传播， 第三次调用*/) {
+        if (stop) return;
         if (who == null) {
             who = mySelf;
         }
@@ -175,6 +177,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
     @Override
     public final void discover(ServiceProvider peer, String appNames, boolean sync,
                                Collection<ServiceProvider> exclude/*排除没有该资源的*/) throws Exception {
+        if (stop) return;
         if (peer == null) {
             if (exclude == null)
                 exclude = new HashSet<>();
@@ -238,6 +241,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
     public final void replicate(ServiceProvider carryNode,
                           ReplicationAction action,
                           boolean sync, boolean callByPeer) throws Exception {
+        if (stop) return;
         String body = JSONUtil.writeValue(carryNode);
         List<HttpTaskCarrierExecutor> executors = new LinkedList<>();
         List<ServiceProvider> myPeerTemp = new LinkedList<>();
@@ -289,6 +293,7 @@ public class DiscoveryNodeProcess implements RegistryClient{
 
     @Override
     public final void antiReplicate(ServiceProvider toWho, String appNames, boolean sync) throws Exception {
+        if (stop) return;
         HttpTaskCarrierExecutor executor = HttpTaskCarrierExecutor.Builder.builder()
                 .byClient(client)
                 .access(HttpMethod.POST, "/antiReplicate")

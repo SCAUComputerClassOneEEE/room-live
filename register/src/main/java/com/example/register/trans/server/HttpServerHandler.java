@@ -32,6 +32,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     @Override
     protected void channelRead0(ChannelHandlerContext cxt, FullHttpRequest request) throws Exception {
+        logger.debug("A request["+request.method()+"] coming for " + request.uri());
         try {
             if (!app.isRunning()) {
                 throw new RuntimeException("server thread end.");
@@ -132,6 +133,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         } else {
             error = HttpResponseStatus.INTERNAL_SERVER_ERROR;
         }
+        logger.error(cause.getMessage());
         response(ctx, error, cause.toString());
     }
 }

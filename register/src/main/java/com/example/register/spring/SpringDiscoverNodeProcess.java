@@ -5,6 +5,8 @@ import com.example.register.process.DiscoveryNodeProcess;
 import com.example.register.serviceInfo.MethodInstance;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.spring.annotation.RegisterMapping;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -13,19 +15,17 @@ import org.springframework.context.ApplicationContextAware;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.client.RestTemplate;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class SpringDiscoverNodeProcess extends DiscoveryNodeProcess implements ApplicationContextAware, SmartInitializingSingleton, DisposableBean {
+    private static final Logger logger = LoggerFactory.getLogger(SpringDiscoverNodeProcess.class);
     private static ApplicationContext applicationContext;
-    protected static List<MethodInstance> methodMappingCache;
+    private static List<MethodInstance> methodMappingCache;
 
     public SpringDiscoverNodeProcess(ApplicationBootConfig config) {
         super(config);
@@ -36,8 +36,7 @@ public class SpringDiscoverNodeProcess extends DiscoveryNodeProcess implements A
         stop();
     }
 
-    @Override
-    public void afterSingletonsInstantiated() {
+    public static List<MethodInstance> initMethodMappingCache(ApplicationContext applicationContext, ServiceProvider mySelf) {
         String[] beanDefinitionNames = applicationContext.getBeanNamesForType(Object.class, false, true);
         for (String beanDefinitionName : beanDefinitionNames) {
             Object bean = applicationContext.getBean(beanDefinitionName);
@@ -54,6 +53,7 @@ public class SpringDiscoverNodeProcess extends DiscoveryNodeProcess implements A
 //                Method mappingMd = mappingEntry.getKey();
                 RegisterMapping rm = mappingEntry.getValue();
                 if (rm == null) continue;
+                logger.debug("Add RegisterMapping(" + rm.name() + ")");
                 if (rm.path().length == 0 && rm.value().length == 0) continue;
                 MethodInstance instance = new MethodInstance();
                 instance.setMethod(rm.method());
@@ -67,9 +67,17 @@ public class SpringDiscoverNodeProcess extends DiscoveryNodeProcess implements A
                 mySelf.addMethod(instance);
             }
         }
-        methodMappingCache = mySelf.getMethodMappingList();
+        return mySelf.getMethodMappingList();
         /* register myself */
-        register(null,true, false, false);
+    }
+
+    @Override
+    public void afterSingletonsInstantiated() {
+        if (!initialized) return;
+        logger.debug("Scanning the request mapping");
+        methodMappingCache = initMethodMappingCache(applicationContext, mySelf);
+        start();
+        logger.info("Starting DiscoveryNodeProcess");
     }
 
     @Override

@@ -90,9 +90,10 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
             try {
                 ChannelFuture bind = bootstrap.bind().sync();
                 server.future = bind;
-                logger.info("server bind " + bootstrap.config().localAddress().toString() + " " + bind.isSuccess());
+                logger.info("Server bind " + bootstrap.config().localAddress().toString() + " " + bind.isSuccess());
                 if (bind.isSuccess()) {
                     while (server.app.flagForStop()) {
+                        logger.debug("Server cycle before sleep");
                         /*before sleep*/
                         long s = System.currentTimeMillis();
                         timerTaskScan(app);
@@ -102,9 +103,9 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                logger.error("server runnable error: " + e.getMessage());
+                logger.error("Server runnable error: " + e.getMessage());
             } finally {
-                logger.info("server end");
+                logger.info("Server end");
                 server.stopThread();
             }
 

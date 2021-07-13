@@ -111,6 +111,7 @@ public class ApplicationClient extends ApplicationThread<Bootstrap, Channel> {
             thread = Thread.currentThread();
             long lastDoPacket = System.currentTimeMillis();
             while (client.flagForStop()) {
+                logger.debug("Client cycle before sleep");
                 long cycleStart = System.currentTimeMillis();
                 client.renew(client.getMyself(), false, client.getMyself().isPeer(), false); // 心跳
                 if (cycleStart - lastDoPacket >= maxTolerateTimeMills

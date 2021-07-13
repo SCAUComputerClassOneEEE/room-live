@@ -31,33 +31,32 @@ import java.util.stream.Collectors;
 public class NameCenterPeerProcess extends DiscoveryNodeProcess implements RegistryServer {
 
     private static final Logger logger = LoggerFactory.getLogger(NameCenterPeerProcess.class);
-    private final RegistryServer.ClusterType clusterType;
+    private RegistryServer.ClusterType clusterType;
 
-    private final ApplicationServer server;
-    private final int heartBeatIntervals;
+    private ApplicationServer server;
+    private int heartBeatIntervals;
 
     public NameCenterPeerProcess(ApplicationBootConfig config) {
         super(config);
+        if (config == null) return;
         clusterType = config.getServerClusterType();
         server = new ApplicationServer(this, config);
         heartBeatIntervals = config.getHeartBeatIntervals();
-        if (config.getServerClusterType().equals(ClusterType.P2P)) {
-            try {
-                syncAll(true);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     /*开启对外服务*/
     @Override
     public void start() {
         /* start server */
-        stop = false;
+        super.start();
+        if (clusterType.equals(ClusterType.P2P)) {
+            try {
+                syncAll(true);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
         server.start();
-        if (clusterType.equals(ClusterType.P2P))
-            register(null, false, true, false);
     }
 
     @Override
@@ -71,6 +70,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
 
     @Override
     public void syncAll(boolean sync) throws Exception {
+        if (stop) return;
         Set<String> apps = table.getAllAsMapSet().keySet();
         StringBuilder sb = new StringBuilder();
         for (String app : apps) {

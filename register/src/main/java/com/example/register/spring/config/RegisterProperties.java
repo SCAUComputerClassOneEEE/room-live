@@ -1,7 +1,6 @@
 package com.example.register.spring.config;
 
 import lombok.Data;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
@@ -10,7 +9,7 @@ import java.util.List;
 @ConfigurationProperties(prefix = "register")
 public class RegisterProperties {
 
-    private String enabled;
+    private String serviceType;
 
     /*
     * self:
@@ -29,37 +28,37 @@ public class RegisterProperties {
     private List<Address> peers;
 
     /*thread*/
-    @Value("register.workerNThread:1")
-    private int workerNThread;
-    @Value("register.bossNThread:1")
-    private int bossNThread;
+
+    private int workerNThread = 1;
+
+    private int bossNThread = 1;
     /*
      * client
      * */
-    @Value("register.taskQueueMaxSize:20")
-    private int taskQueueMaxSize;
-    @Value("register.nextQueueSize:4")
-    private int nextQueueSize;
-    @Value("register.connectTimeOut:3000")
-    private int connectTimeOut; // mills
-    @Value("register.readTimeOut:3000")
-    private int readTimeOut; // mills
-    @Value("register.maxTolerateTimeMills:500")
-    private int maxTolerateTimeMills;
-    @Value("register.heartBeatIntervals:30000")
-    private int heartBeatIntervals;
+
+    private int taskQueueMaxSize = 20;
+
+    private int nextQueueSize = 4;
+
+    private int connectTimeOut = 3000; // mills
+
+    private int readTimeOut = 3000; // mills
+
+    private int maxTolerateTimeMills = 500;
+
+    private int heartBeatIntervals = 30000;
 
     /*
      * server
      * */
-    @Value("register.writeTimeOut:3000")
-    private int writeTimeOut; // mills
-    @Value("register.writeTimeOut:8080")
-    private int serverPort;
-    @Value("register.maxContentLength:5242880")
-    private int maxContentLength;
-    @Value("register.backLog:1024")
-    private int backLog;
+
+    private int writeTimeOut = 3000; // mills
+
+    private int serverPort = 8000;
+
+    private int maxContentLength = 5242880;
+
+    private int backLog = 1024;
 
     @Data
     public static class Address {

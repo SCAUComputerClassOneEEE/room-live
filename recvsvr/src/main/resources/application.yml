@@ -1,0 +1,18 @@
+server:
+  port: 8080
+register:
+  serviceType: node
+  self:
+    host: localhost
+    port: 8081
+    app-name: server-peer-node-service
+  peers:
+    - host: localhost
+      port: 8082
+      app-name: server-peer-node-service
+    - host: localhost
+      port: 8083
+      app-name: server-peer-node-service
+  server-port: 8081
+  heart-beat-intervals: 3000
+debug: true
