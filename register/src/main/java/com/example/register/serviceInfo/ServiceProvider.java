@@ -18,6 +18,7 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
     private String appName;
     private String host;
     private int port;
+    private String protocol;
     private final List<MethodInstance> methodMappingList;
 
     private final String mask;
@@ -33,6 +34,7 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
         avgAccess = new AtomicDouble(0.0);
         mask = String.valueOf(mask())/*UUID.randomUUID().toString()*/;
         methodMappingList = new LinkedList<>();
+        protocol = "http://";
     }
 
     public ServiceProvider(String appName, String host, int port) {
@@ -45,6 +47,7 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
         lastRenewStamp = new Timestamp(new Date().getTime());
         mask = String.valueOf(mask())/*UUID.randomUUID().toString()*/;
         methodMappingList = new LinkedList<>();
+        protocol = "http://";
     }
 
     public void addMethod(MethodInstance m) {
@@ -60,27 +63,19 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
         }
     }
 
-    public List<MethodInstance> getMethodMappingList() {
-        return methodMappingList;
-    }
+    public String getProtocol() { return protocol; }
 
-    public AtomicInteger getHistoryInt() {
-        return historyInt;
-    }
+    public void setProtocol(String protocol) { this.protocol = protocol; }
 
-    public Timestamp getLastRenewStamp() {
-        return lastRenewStamp;
-    }
+    public List<MethodInstance> getMethodMappingList() { return methodMappingList; }
 
-    public void setLastRenewStamp(Timestamp lastRenewStamp) {
-        this.lastRenewStamp = lastRenewStamp;
-    }
+    public void setHostAndPort(String host, int port) { this.host = host; this.port = port; }
 
     public boolean isPeer() {
         return appName.equals(ServiceApplicationsTable.SERVER_PEER_NODE);
     }
 
-    public String getMask() { return mask; }
+    protected String getMask() { return mask; }
 
     public String getAppName() {
         return appName;
@@ -94,9 +89,9 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
         return port;
     }
 
-    public AtomicInteger getConnectingInt() { return connectingInt; }
+    protected AtomicInteger getConnectingInt() { return connectingInt; }
 
-    public AtomicDouble getAvgAccess() { return avgAccess; }
+    protected AtomicDouble getAvgAccess() { return avgAccess; }
 
     /**
      * 只在renew的函数中发生

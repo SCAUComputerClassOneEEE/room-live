@@ -1,6 +1,7 @@
 package com.example.register.process;
 
 
+import com.example.register.serviceInfo.MethodInstance;
 import com.example.register.serviceInfo.ServiceApplicationsTable;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.example.register.trans.client.ApplicationClient;
@@ -12,8 +13,10 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.*;
+import java.util.function.Predicate;
 
 
 /**
@@ -305,6 +308,16 @@ public class DiscoveryNodeProcess implements RegistryClient{
     @Override
     public Set<ServiceProvider> find(String appName) {
         return table.getAppsAsSet(appName);
+    }
+
+    @Override
+    public MethodInstance[] getAllMethodsMapping(String appName, ServiceProvider serviceProvider) {
+        if (appName == null) return null;
+        ServiceProvider optimal = table.getOptimal(appName, null);
+        if (optimal == null)
+            return null;
+        serviceProvider.setHostAndPort(optimal.getHost(), optimal.getPort());
+        return optimal.getMethodMappingList().toArray(new MethodInstance[0]);
     }
 
     @Override

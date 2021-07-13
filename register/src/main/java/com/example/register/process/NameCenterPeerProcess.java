@@ -57,7 +57,7 @@ public class NameCenterPeerProcess extends DiscoveryNodeProcess implements Regis
         stop = false;
         server.start();
         if (clusterType.equals(ClusterType.P2P))
-            register(mySelf, false, true, false);
+            register(null, false, true, false);
     }
 
     @Override

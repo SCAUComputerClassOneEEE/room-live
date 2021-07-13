@@ -1,0 +1,3 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.example.register.spring.RegisterNodeConfiguration;\
+  com.example.register.spring.config.RegisterPeerConfiguration

@@ -115,7 +115,7 @@ public class ApplicationServer extends ApplicationThread<ServerBootstrap, Server
 
             noBeatMap.forEach((appName, apps)->{
                 for (ServiceProvider app : apps) {
-                    if (app.getMask().equals(server.getMyself().getMask())) continue;
+                    if (app.equals(server.getMyself())) continue;
                     logger.debug("have no new heat " + app);
                     server.offline(app, false, true, false);
                 }

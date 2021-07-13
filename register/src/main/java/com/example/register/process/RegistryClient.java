@@ -1,7 +1,9 @@
 package com.example.register.process;
 
+import com.example.register.serviceInfo.MethodInstance;
 import com.example.register.serviceInfo.ServiceProvider;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.springframework.web.bind.annotation.RequestMethod;
 
 import java.util.Collection;
 import java.util.List;
@@ -40,4 +42,6 @@ public interface RegistryClient extends Application, MethodNestable {
     void antiReplicate(ServiceProvider toWho, String appNames, boolean sync) throws Exception;
 
     Set<ServiceProvider> find(String appName);
+
+    MethodInstance[] getAllMethodsMapping(String appName, ServiceProvider serviceProvider);
 }

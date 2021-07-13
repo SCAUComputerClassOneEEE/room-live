@@ -1,4 +1,4 @@
-package com.example.register.spring;
+package com.example.register.spring.config;
 
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,8 +63,9 @@ public class RegisterProperties {
 
     @Data
     public static class Address {
-        String appName;
+        String appName = "default_client-application";
         String host;
         int port;
+        String protocol = "http://";
     }
 }

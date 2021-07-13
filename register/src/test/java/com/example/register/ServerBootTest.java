@@ -15,7 +15,7 @@ public class ServerBootTest {
 
     static {
         selfNode = new ServiceProvider(ServiceApplicationsTable.SERVER_PEER_NODE, "localhost", 8000);
-        otherPeers.put(selfNode.getMask(), selfNode);
+//        otherPeers.put(selfNode.getMask(), selfNode);
     }
 
     public static void main(String[] args) throws Exception {

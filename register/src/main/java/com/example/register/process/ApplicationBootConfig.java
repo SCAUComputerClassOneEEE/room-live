@@ -1,8 +1,7 @@
 package com.example.register.process;
 
-import com.example.register.process.RegistryServer;
 import com.example.register.serviceInfo.ServiceProvider;
-import com.example.register.spring.RegisterProperties;
+import com.example.register.spring.config.RegisterProperties;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -46,13 +45,18 @@ public class ApplicationBootConfig {
     public ApplicationBootConfig(RegisterProperties properties) {
         RegisterProperties.Address self = properties.getSelf();
         selfNode = new ServiceProvider(self.getAppName(), self.getHost(), self.getPort());
+        selfNode.setProtocol(self.getProtocol());
         othersPeerServerNodes = new HashMap<>();
         List<RegisterProperties.Address> servers = properties.getPeers();
-        for (RegisterProperties.Address peer : servers) {
-            String appName = peer.getAppName();
-            String host = peer.getHost();
-            int port = peer.getPort();
-            othersPeerServerNodes.put(appName, new ServiceProvider(appName, host, port));
+        for (RegisterProperties.Address peerAd : servers) {
+            String appName = peerAd.getAppName();
+            String host = peerAd.getHost();
+            int port = peerAd.getPort();
+            String protocol = peerAd.getProtocol();
+
+            ServiceProvider peer = new ServiceProvider(appName, host, port);
+            peer.setProtocol(protocol);
+            othersPeerServerNodes.put(appName, peer);
         }
         serverClusterType = othersPeerServerNodes.size() > 1 ?
                 RegistryServer.ClusterType.P2P : RegistryServer.ClusterType.SINGLE;

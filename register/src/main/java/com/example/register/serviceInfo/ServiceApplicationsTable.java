@@ -145,7 +145,12 @@ public class ServiceApplicationsTable {
         if (appsAsSet.size() == 0)
             return null;
         Object[] objects = appsAsSet.stream()
-                .filter(e->!exclude.contains(e))
+                .filter(e-> {
+                    if (exclude != null)
+                        return !exclude.contains(e);
+                    else
+                        return true;
+                })
                 .sorted(new FastestResponseComparator()).distinct().toArray();
         return (ServiceProvider)objects[0];
     }

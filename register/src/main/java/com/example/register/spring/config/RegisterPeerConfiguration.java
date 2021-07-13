@@ -1,6 +1,7 @@
-package com.example.register.spring;
+package com.example.register.spring.config;
 
 import com.example.register.process.ApplicationBootConfig;
+import com.example.register.spring.SpringNameCenterPeerProcess;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,22 +14,22 @@ import javax.annotation.Resource;
 
 @Configuration
 @EnableConfigurationProperties(RegisterProperties.class)
-@ConditionalOnProperty(prefix = "register.serviceType", havingValue = "node")
-public class RegisterNodeConfiguration {
+@ConditionalOnProperty(prefix = "register.serviceType", havingValue = "peer")
+public class RegisterPeerConfiguration {
 
-    private static final Logger logger = LoggerFactory.getLogger(RegisterNodeConfiguration.class);
+    private static final Logger logger = LoggerFactory.getLogger(RegisterPeerConfiguration.class);
 
     @Resource
     private RegisterProperties registerProperties;
 
     @Bean
     @Scope(value = "singleton")
-    public SpringDiscoverNodeProcess springDiscoverNodeProcess() {
-        logger.info("SpringDiscoverNodeProcess init...");
+    public SpringNameCenterPeerProcess springDiscoverNodeProcess() {
+        logger.info("SpringNameCenterPeerProcess init...");
         ApplicationBootConfig config = new ApplicationBootConfig(registerProperties);
-        SpringDiscoverNodeProcess nodeProcess = new SpringDiscoverNodeProcess(config);
-        nodeProcess.start();
-        logger.info("SpringDiscoverNodeProcess start...");
-        return nodeProcess;
+        SpringNameCenterPeerProcess peerProcess = new SpringNameCenterPeerProcess(config);
+        peerProcess.start();
+        logger.info("SpringNameCenterPeerProcess start...");
+        return peerProcess;
     }
 }
