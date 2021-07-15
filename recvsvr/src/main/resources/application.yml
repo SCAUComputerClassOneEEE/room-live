@@ -1,14 +1,14 @@
 server:
   port: 8080
 register:
-  serviceType: node
+  serviceType: peer
   self:
     host: localhost
     port: 8081
     app-name: server-peer-node-service
   peers:
     - host: localhost
-      port: 8082
+      port: 8081
       app-name: server-peer-node-service
     - host: localhost
       port: 8083

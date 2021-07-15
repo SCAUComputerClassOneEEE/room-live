@@ -197,7 +197,7 @@ public class HttpTaskCarrierExecutor {
     * */
     protected void success(FullHttpResponse result) {
         endExec = System.currentTimeMillis();
-        provider.fixAccessAvg(endExec - startExec);
+        provider.fixAccessAvg((int)(endExec - startExec));
         provider.decrementConnectingInt();
         setResult(result);
         HttpTaskExecutorPool.getInstance().submit(this.doneTodo);
@@ -206,7 +206,7 @@ public class HttpTaskCarrierExecutor {
     protected void fail(ResultType type, Throwable cause) {
         cause.printStackTrace();
         endExec = System.currentTimeMillis();
-        provider.fixAccessAvg(endExec - startExec);
+        provider.fixAccessAvg((int)(endExec - startExec));
         provider.decrementConnectingInt();
         setResult(type, cause);
         HttpTaskExecutorPool.getInstance().submit(this.doneTodo);

@@ -1,9 +1,6 @@
 package com.example.register.serviceInfo;
 
 
-import com.example.register.utils.JSONUtil;
-import com.google.common.util.concurrent.AtomicDouble;
-import lombok.SneakyThrows;
 import lombok.ToString;
 
 import java.io.Serializable;
@@ -25,13 +22,13 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
     private Timestamp lastRenewStamp;
     private final AtomicInteger connectingInt; // 正在连接数
     private final AtomicInteger historyInt; // 历史连接数
-    private final AtomicDouble avgAccess; // 平均响应时间
+    private final AtomicInteger avgAccess; // 平均响应时间
 
     public ServiceProvider() {
         lastRenewStamp = new Timestamp(new Date().getTime());
         connectingInt = new AtomicInteger(0);
         historyInt = new AtomicInteger(0);
-        avgAccess = new AtomicDouble(0.0);
+        avgAccess = new AtomicInteger(0); // mills
         mask = String.valueOf(mask())/*UUID.randomUUID().toString()*/;
         methodMappingList = new LinkedList<>();
         protocol = "http://";
@@ -43,7 +40,7 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
         this.appName = appName;
         connectingInt = new AtomicInteger(0);
         historyInt = new AtomicInteger(0);
-        avgAccess = new AtomicDouble(0.0);
+        avgAccess = new AtomicInteger(0);
         lastRenewStamp = new Timestamp(new Date().getTime());
         mask = String.valueOf(mask())/*UUID.randomUUID().toString()*/;
         methodMappingList = new LinkedList<>();
@@ -91,7 +88,7 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
 
     protected AtomicInteger getConnectingInt() { return connectingInt; }
 
-    protected AtomicDouble getAvgAccess() { return avgAccess; }
+    protected AtomicInteger getAvgAccess() { return avgAccess; }
 
     /**
      * 只在renew的函数中发生
@@ -122,7 +119,7 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
             return false;
         connectingInt.set(newCover.connectingInt.get());
         historyInt.set(newCover.historyInt.get());
-        avgAccess.set(newCover.avgAccess.doubleValue());
+        avgAccess.set(newCover.avgAccess.get());
         return true;
     }
 
@@ -135,10 +132,10 @@ public class ServiceProvider implements Serializable, Comparable<ServiceProvider
         connectingInt.decrementAndGet();
     }
 
-    public double fixAccessAvg(double newAccess) {
+    public double fixAccessAvg(int newAccess) {
         final int nowHistoryInt = historyInt.get();
-        final double oldAvg = avgAccess.doubleValue();
-        final double newAvg = (oldAvg * (nowHistoryInt - 1) + newAccess) / nowHistoryInt;
+        final int oldAvg = avgAccess.get();
+        final int newAvg = (oldAvg * (nowHistoryInt - 1) + newAccess) / nowHistoryInt;
         if (avgAccess.compareAndSet(oldAvg, newAvg)) {
             return avgAccess.doubleValue();
         }
